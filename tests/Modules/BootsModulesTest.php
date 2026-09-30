@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
+use Apps\Iam\Models\User;
+use Apps\Iam\Providers\IamServiceProvider;
 use Illuminate\Database\Migrations\Migrator;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Router;
-use Modules\Iam\Models\User;
-use Modules\Iam\Providers\IamServiceProvider;
-use Modulith\Services\ModuleRegistry;
+use Modulith\Services\Modules\ModuleRegistry;
 use Modulith\Tests\Support\ModuleAppTestCase;
 
 uses(ModuleAppTestCase::class);
@@ -53,18 +53,18 @@ it('loads the module translations under the module namespace', function () {
     expect(__('iam::messages.hello'))->toBe('Hello from iam');
 });
 
-it('registers the module migrations path', function () {
+it('keeps the module migrations out of the application migrator, so they never land in its database', function () {
     /** @var Migrator $migrator */
     $migrator = $this->app->make('migrator');
 
     expect($migrator->paths())
-        ->toContain(dirname(__DIR__).'/Fixtures/modules/Iam/database/migrations');
+        ->not->toContain(dirname(__DIR__).'/Fixtures/apps/Iam/database/migrations');
 });
 
 it('autoloads a module namespace from its app directory, with no composer.json entry', function () {
     expect(class_exists(User::class))->toBeTrue()
         ->and(new ReflectionClass(User::class)->getFileName())
-        ->toBe(dirname(__DIR__).'/Fixtures/modules/Iam/app/Models/User.php');
+        ->toBe(dirname(__DIR__).'/Fixtures/apps/Iam/app/Models/User.php');
 });
 
 it('registers the module console commands', function () {

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Modulith\Console\Commands;
 
 use Illuminate\Console\Command;
-use Modulith\Services\ModuleRegistry;
-use Modulith\Services\Outbox\Relay;
+use Modulith\Services\Modules\ModuleRegistry;
+use Modulith\Services\Stream\Outbox\Relay;
 
 /**
  * For the day the broker is emptied while the outboxes are intact: the stream is rebuilt from

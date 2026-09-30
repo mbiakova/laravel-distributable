@@ -12,16 +12,51 @@ final readonly class Rpc
 {
     public function __construct(private Repository $config) {}
 
-    /** @return array<class-string, array{module: string, local: class-string, remote: class-string}> */
+    /** @return array<class-string, array{module: string, rpc: class-string}> */
     public function getServices(): array
     {
-        /** @var array<class-string, array{module: string, local: class-string, remote: class-string}> */
+        /** @var array<class-string, array{module: string, rpc: class-string}> */
         return (array) $this->config->get('rpc.services', []);
+    }
+
+    public function hasHost(string $module): bool
+    {
+        return array_key_exists($module, (array) $this->config->get('rpc.hosts', []));
     }
 
     public function getHost(string $module): string
     {
-        /** @var array<string, string> $hosts */
+        $host = $this->host($module);
+
+        return (string) (is_array($host) ? ($host['url'] ?? '') : $host);
+    }
+
+    /** The transport a module's calls travel on: its host's `transport`, or rpc.default. */
+    public function getTransportOf(string $module): string
+    {
+        $host = $this->host($module);
+
+        return (string) (is_array($host) && isset($host['transport']) ? $host['transport'] : $this->getDefaultTransport());
+    }
+
+    public function getDefaultTransport(): string
+    {
+        return (string) $this->config->get('rpc.default', 'http');
+    }
+
+    /** @return array<string, mixed> */
+    public function getTransport(string $name): array
+    {
+        /** @var array<string, array<string, mixed>> $transports */
+        $transports = (array) $this->config->get('rpc.transports', []);
+
+        return $transports[$name] ?? throw ConfigurationException::unknownRpcTransport($name);
+    }
+
+    /** @return string|array<string, mixed> */
+    private function host(string $module): string|array
+    {
+        /** @var array<string, string|array<string, mixed>> $hosts */
         $hosts = (array) $this->config->get('rpc.hosts', []);
 
         return $hosts[$module] ?? throw ConfigurationException::missingRpcHost($module);

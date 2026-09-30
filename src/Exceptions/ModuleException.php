@@ -29,6 +29,11 @@ final class ModuleException extends RuntimeException
         return new self("Duplicate module name [{$name}] in the module source.");
     }
 
+    public static function outsideFoundation(string $class, string $root): self
+    {
+        return new self("[{$class}] is not under the foundation namespace [{$root}]: an RpcService lives in its module's foundation.");
+    }
+
     /** A class the package needs to attach to a module lives outside every module namespace. */
     public static function outsideModule(string $class): self
     {

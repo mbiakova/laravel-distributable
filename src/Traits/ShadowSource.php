@@ -7,18 +7,15 @@ namespace Modulith\Traits;
 use BackedEnum;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Model;
-use Modulith\Contracts\Bus;
-use Modulith\Data\Module;
+use Modulith\Contracts\Stream\Bus;
 use Modulith\Events\ShadowChanged;
+use Modulith\Services\Modules\ModuleContext;
 
 /**
  * Put on a model other modules keep a copy of. Every write announces the row as it now stands;
  * only the $shadowed fields travel, so a field left out never leaves its module.
  *
- * Its host is a Modulith\Models\Model, which already knows its module.
- *
  * @property-read list<string> $shadowed
- * @property-read Module $module
  *
  * @method static \Illuminate\Database\Eloquent\Builder<static> query()
  * @method static void saved(\Closure $callback)
@@ -28,6 +25,8 @@ use Modulith\Events\ShadowChanged;
  */
 trait ShadowSource
 {
+    use ResolvesModule;
+
     public static function bootShadowSource(): void
     {
         static::saved(static function (self $model): void {
@@ -39,8 +38,12 @@ trait ShadowSource
         static::deleted(static fn (self $model) => $model->announceShadow(deleted: true));
     }
 
-    /** A source row deleted for good still reaches the copies, as a soft delete of theirs. */
-    public function announceShadow(bool $deleted = false): void
+    /**
+     * A source row deleted for good still reaches the copies, as a soft delete of theirs.
+     *
+     * @param  list<string>  $keepers  the only modules to update their copy; empty for all of them
+     */
+    public function announceShadow(bool $deleted = false, array $keepers = []): void
     {
         $attributes = $this->shadowedAttributes();
 
@@ -53,19 +56,26 @@ trait ShadowSource
             source: $this->getTable(),
             key: $this->getKey(),
             attributes: $attributes,
+            keepers: $keepers,
         ));
     }
 
-    /** Re-announces every row, soft-deleted ones included; a copy already in step is rewritten with itself. */
-    public static function announceAll(int $chunk = 500): int
+    /**
+     * Re-announces every row, soft-deleted ones included; a copy already in step is rewritten with itself.
+     *
+     * @param  list<string>  $keepers
+     */
+    public static function announceAll(int $chunk = 500, array $keepers = []): int
     {
         $announced = 0;
 
-        static::query()->withoutGlobalScopes()->chunkById($chunk, function ($rows) use (&$announced): void {
-            foreach ($rows as $row) {
-                $row->announceShadow();
-                $announced++;
-            }
+        app(ModuleContext::class)->within((new static)->module, static function () use ($chunk, $keepers, &$announced): void {
+            static::query()->withoutGlobalScopes()->chunkById($chunk, function ($rows) use (&$announced, $keepers): void {
+                foreach ($rows as $row) {
+                    $row->announceShadow(keepers: $keepers);
+                    $announced++;
+                }
+            });
         });
 
         return $announced;

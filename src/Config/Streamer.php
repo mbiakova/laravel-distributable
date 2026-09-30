@@ -5,20 +5,40 @@ declare(strict_types=1);
 namespace Modulith\Config;
 
 use Illuminate\Contracts\Config\Repository;
+use Modulith\Exceptions\ConfigurationException;
 
 /** The streamer.* settings, typed and defaulted; read live, never snapshotted. */
 final readonly class Streamer
 {
     public function __construct(private Repository $config) {}
 
-    public function getTransport(): string
+    public function getDefaultStream(): string
     {
-        return (string) $this->config->get('streamer.transport', 'redis');
+        return (string) $this->config->get('streamer.default', 'default');
     }
 
-    public function getOutbox(): bool
+    /** @return array<string, mixed> */
+    public function getStream(string $name): array
     {
-        return (bool) $this->config->get('streamer.outbox', false);
+        /** @var array<string, array<string, mixed>> $streams */
+        $streams = $this->config->get('streamer.streams', []);
+
+        return $streams[$name] ?? throw ConfigurationException::unknownStream($name);
+    }
+
+    public function getRedisStream(string $name): RedisStream
+    {
+        return new RedisStream($this->config, $name);
+    }
+
+    public function getQueueStream(string $name): QueueStream
+    {
+        return new QueueStream($this->config, $name);
+    }
+
+    public function usesOutbox(string $stream): bool
+    {
+        return (bool) $this->config->get("streamer.streams.{$stream}.outbox", false);
     }
 
     public function getGuard(): ?bool

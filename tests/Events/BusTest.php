@@ -2,23 +2,26 @@
 
 declare(strict_types=1);
 
+use Apps\Iam\Events\UserAudited;
+use Apps\Iam\Events\UserIgnored;
+use Apps\Iam\Events\UserRegistered;
+use Apps\Iam\Support\Recorder;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Context;
-use Modules\Iam\Events\UserIgnored;
-use Modules\Iam\Events\UserRegistered;
-use Modules\Iam\Support\Recorder;
-use Modulith\Contracts\Bus;
-use Modulith\Contracts\Transport;
+use Illuminate\Support\Facades\DB;
+use Modulith\Contracts\Stream\Bus;
+use Modulith\Contracts\Stream\Transport;
 use Modulith\Data\Envelope;
-use Modulith\Services\Dispatcher;
-use Modulith\Services\TransportManager;
+use Modulith\Exceptions\ConfigurationException;
+use Modulith\Services\Stream\Dispatcher;
+use Modulith\Services\Stream\TransportManager;
 use Modulith\Tests\Support\ModuleAppTestCase;
 use Modulith\Tests\Support\RecordingTransport;
 
 uses(ModuleAppTestCase::class);
 
 beforeEach(function () {
-    Config::set('streamer.transport', 'array');
+    Config::set('streamer.streams.default.driver', 'array');
     $this->app->singleton(Recorder::class);
 
     // A consumer-supplied transport, registered exactly as a real one would be.
@@ -48,7 +51,7 @@ it('ignores an event nobody listens to', function () {
 });
 
 it('drops every event on the null transport', function () {
-    Config::set('streamer.transport', 'null');
+    Config::set('streamer.streams.default.driver', 'null');
 
     $this->app->make(Bus::class)->emit(new UserRegistered(5, 'lamp'));
     $this->artisan('modulith:events:consume --module=iam')->assertSuccessful();
@@ -57,7 +60,7 @@ it('drops every event on the null transport', function () {
 });
 
 it('stamps the envelope with the emitting module and a unique id', function () {
-    Config::set('streamer.transport', 'recording');
+    Config::set('streamer.streams.default.driver', 'recording');
     $transport = $this->app->make(RecordingTransport::class);
 
     $bus = $this->app->make(Bus::class);
@@ -72,7 +75,7 @@ it('stamps the envelope with the emitting module and a unique id', function () {
 });
 
 it('carries only the configured context keys in the headers', function () {
-    Config::set('streamer.transport', 'recording');
+    Config::set('streamer.streams.default.driver', 'recording');
     Config::set('streamer.propagate', ['trace_id']);
     $transport = $this->app->make(RecordingTransport::class);
 
@@ -94,6 +97,17 @@ it('restores the propagated context around the handler, then the caller one', fu
         ->and(Context::get('trace_id'))->toBe('abc');
 });
 
+it('runs a handler on the database of its own module, then puts the caller one back', function () {
+    $default = DB::getDefaultConnection();
+
+    $this->app->make(Dispatcher::class)->dispatch(
+        new Envelope('00000000-0000-0000-0000-000000000002', 'iam', 'iam.user.registered', ['id' => 5, 'name' => 'lamp'], [], now()->toImmutable()),
+    );
+
+    expect($this->app->make(Recorder::class)->connections)->toBe(['iam'])
+        ->and(DB::getDefaultConnection())->toBe($default);
+});
+
 it('round-trips an envelope through the wire format', function () {
     $envelope = Envelope::for(new UserRegistered(5, 'lamp'), 'iam', ['trace_id' => 'abc']);
 
@@ -108,13 +122,37 @@ it('round-trips an envelope through the wire format', function () {
 });
 
 it('lets a consumer plug its own transport without touching the kernel', function () {
-    Config::set('streamer.transport', 'recording');
+    Config::set('streamer.streams.default.driver', 'recording');
 
     expect($this->app->make(Transport::class))->toBeInstanceOf(RecordingTransport::class);
 });
 
 it('fails loudly on a transport nobody registered', function () {
-    Config::set('streamer.transport', 'kafka');
+    Config::set('streamer.streams.default.driver', 'kafka');
 
     $this->app->make(Bus::class)->emit(new UserRegistered(5, 'lamp'));
-})->throws(InvalidArgumentException::class, 'Driver [kafka] not supported.');
+})->throws(ConfigurationException::class, 'Stream driver [kafka] of stream [default] is not supported');
+
+it('fails loudly on a stream nobody declared', function () {
+    $this->app->make(TransportManager::class)->stream('payments');
+})->throws(ConfigurationException::class, 'Stream [payments] is not declared');
+
+it('puts an event on the stream it names, declared by its module', function () {
+    $this->app->make(Bus::class)->emit(new UserAudited(7));
+
+    $audit = $this->app->make(TransportManager::class)->stream('audit');
+    $received = [];
+    $audit->consume('analytics', ['iam'], function (Envelope $envelope) use (&$received): void {
+        $received[] = $envelope;
+    });
+
+    $default = [];
+    $this->app->make(TransportManager::class)->stream()->consume('analytics', ['iam'], function (Envelope $envelope) use (&$default): void {
+        $default[] = $envelope;
+    });
+
+    expect($received)->toHaveCount(1)
+        ->and($received[0]->stream)->toBe('audit')
+        ->and($received[0]->payload)->toBe(['id' => 7])
+        ->and($default)->toBe([]);
+});

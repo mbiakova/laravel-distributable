@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
+use Apps\Iam\Events\UserRegistered;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Modules\Iam\Events\UserRegistered;
-use Modulith\Contracts\Bus;
-use Modulith\Contracts\Transport;
+use Modulith\Contracts\Stream\Bus;
+use Modulith\Contracts\Stream\Transport;
 use Modulith\Data\Envelope;
 use Modulith\Tests\Support\ModuleAppTestCase;
-use Modulith\Transports\QueueTransport;
+use Modulith\Transports\Stream\QueueTransport;
 
 uses(ModuleAppTestCase::class);
 
@@ -23,8 +23,7 @@ beforeEach(function () {
         'queue' => 'default',
         'retry_after' => 90,
     ]);
-    Config::set('streamer.transport', 'queue');
-    Config::set('streamer.queue.connection', 'modulith');
+    Config::set('streamer.streams.default', ['driver' => 'queue', 'connection' => 'modulith']);
 
     Schema::connection('iam')->create('jobs', function (Blueprint $table): void {
         $table->id();
@@ -41,7 +40,7 @@ it('fans an envelope out to one queue per module with a database', function () {
     $this->app->make(Bus::class)->emit(new UserRegistered(5, 'ada'));
 
     expect(DB::connection('iam')->table('jobs')->orderBy('queue')->pluck('queue')->all())
-        ->toBe(['modulith-events-analytics', 'modulith-events-iam']);
+        ->toBe(['modulith-default-analytics', 'modulith-default-iam']);
 });
 
 it('hands the consumer its own copy, then deletes it', function () {
@@ -57,5 +56,5 @@ it('hands the consumer its own copy, then deletes it', function () {
     });
 
     expect($received)->toBe([['id' => 5, 'name' => 'ada']])
-        ->and(DB::connection('iam')->table('jobs')->pluck('queue')->all())->toBe(['modulith-events-analytics']);
+        ->and(DB::connection('iam')->table('jobs')->pluck('queue')->all())->toBe(['modulith-default-analytics']);
 });

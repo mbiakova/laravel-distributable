@@ -23,7 +23,10 @@ return new class extends Migration
             $table->json('payload');
             $table->json('headers');
             $table->timestamp('emitted_at');
+            $table->json('recipients');
+            $table->string('stream');
             $table->timestamp('published_at')->nullable();
+            $table->string('stream_id')->nullable(); // the entry's id on a transport that tracks acknowledgements
             $table->unsignedSmallInteger('attempts')->default(0);
             $table->text('last_error')->nullable();
 

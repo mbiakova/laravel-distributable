@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
+use Apps\Iam\Events\UserRegistered;
+use Apps\Iam\Handlers\OnUserRegistered;
+use Apps\Iam\Support\Recorder;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
-use Modules\Iam\Events\UserRegistered;
-use Modules\Iam\Handlers\OnUserRegistered;
-use Modules\Iam\Support\Recorder;
 use Modulith\Data\Envelope;
-use Modulith\Services\Dispatcher;
+use Modulith\Services\Stream\Dispatcher;
 use Modulith\Tests\Support\ModuleAppTestCase;
 
 uses(ModuleAppTestCase::class);
@@ -58,15 +58,15 @@ it('leaves no mark when the handler fails, so the event is replayed', function (
 
 it('stays off when delivery is exactly-once', function () {
     Config::set('streamer.guard', null);
-    Config::set('streamer.outbox', false);
-    Config::set('streamer.transport', 'array');
+    Config::set('streamer.streams.default.outbox', false);
+    Config::set('streamer.streams.default.driver', 'array');
 
     expect($this->app->make(Dispatcher::class)->guarded())->toBeFalse();
 });
 
 it('turns itself on when the outbox is on', function () {
     Config::set('streamer.guard', null);
-    Config::set('streamer.outbox', true);
+    Config::set('streamer.streams.default.outbox', true);
 
     expect($this->app->make(Dispatcher::class)->guarded())->toBeTrue();
 });

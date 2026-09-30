@@ -7,7 +7,7 @@ namespace Modulith\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Context;
-use Modulith\Services\RpcSignature;
+use Modulith\Services\Rpc\RpcSignature;
 use Symfony\Component\HttpFoundation\Response;
 
 /** Guards every module's routes/rpc.php: only a correctly signed, fresh call gets through. */
@@ -17,18 +17,22 @@ final readonly class VerifyRpcSignature
 
     public function handle(Request $request, Closure $next): Response
     {
+        $context = (string) $request->header(RpcSignature::CONTEXT_HEADER, '{}');
+
         $verified = $this->signature->verify(
             (string) $request->header(RpcSignature::TIMESTAMP_HEADER),
+            (string) $request->header(RpcSignature::NONCE_HEADER),
             '/'.ltrim($request->path(), '/'),
             $request->getContent(),
+            $context,
             (string) $request->header(RpcSignature::SIGNATURE_HEADER),
         );
 
         abort_unless($verified, 403, 'Invalid RPC signature.');
 
-        /** @var array<string, mixed> $context */
-        $context = json_decode((string) $request->header(RpcSignature::CONTEXT_HEADER, '{}'), true) ?: [];
-        Context::add($context);
+        /** @var array<string, mixed> $values */
+        $values = json_decode($context, true) ?: [];
+        Context::add($values);
 
         return $next($request);
     }

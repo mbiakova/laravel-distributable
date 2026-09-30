@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modulith\Config;
 
 use Illuminate\Contracts\Config\Repository;
-use Modulith\Services\ManifestSource;
+use Modulith\Services\Modules\ManifestSource;
 
 /** The modulith.* settings, typed and defaulted; read live, never snapshotted. */
 final readonly class Modules
@@ -29,12 +29,25 @@ final readonly class Modules
 
     public function getModulesPath(): string
     {
-        return (string) $this->config->get('modulith.modules_path', 'modules');
+        return (string) $this->config->get('modulith.modules_path', 'apps');
     }
 
     public function getModulesNamespace(): string
     {
-        return (string) $this->config->get('modulith.modules_namespace', 'Modules');
+        return (string) $this->config->get('modulith.modules_namespace', 'Apps');
+    }
+
+    /** Absolute, resolved against the project root when relative. */
+    public function getFoundationPath(): string
+    {
+        $path = (string) $this->config->get('modulith.foundation_path', 'foundation');
+
+        return str_starts_with($path, DIRECTORY_SEPARATOR) ? $path : base_path($path);
+    }
+
+    public function getFoundationNamespace(): string
+    {
+        return (string) $this->config->get('modulith.foundation_namespace', 'Foundation');
     }
 
     public function getStatusRoute(): ?string

@@ -6,7 +6,7 @@ namespace Modulith\Traits;
 
 use Modulith\Data\Module;
 use Modulith\Exceptions\ModuleException;
-use Modulith\Services\ModuleRegistry;
+use Modulith\Services\Modules\ModuleRegistry;
 
 trait ResolvesModule
 {

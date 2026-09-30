@@ -19,6 +19,7 @@ final readonly class Envelope
     /**
      * @param  array<string, mixed>  $payload
      * @param  array<string, mixed>  $headers  context carried across modules (streamer.propagate)
+     * @param  list<string>  $recipients  the only modules that handle it; empty for every module
      */
     public function __construct(
         public string $id,
@@ -27,10 +28,12 @@ final readonly class Envelope
         public array $payload,
         public array $headers,
         public CarbonImmutable $emittedAt,
+        public array $recipients = [],
+        public string $stream = 'default',
     ) {}
 
     /** @param array<string, mixed> $headers */
-    public static function for(Event $event, string $emitter, array $headers = []): self
+    public static function for(Event $event, string $emitter, array $headers = [], string $stream = 'default'): self
     {
         return new self(
             // uuid7: time-ordered, so the unique index stays local.
@@ -40,7 +43,14 @@ final readonly class Envelope
             payload: $event->payload(),
             headers: $headers,
             emittedAt: Date::now()->toImmutable(),
+            recipients: $event->recipients(),
+            stream: $stream,
         );
+    }
+
+    public function isFor(string $module): bool
+    {
+        return $this->recipients === [] || in_array($module, $this->recipients, true);
     }
 
     /** @return array<string, mixed> */
@@ -53,6 +63,8 @@ final readonly class Envelope
             'payload' => $this->payload,
             'headers' => $this->headers,
             'emitted_at' => $this->emittedAt->toIso8601ZuluString('microsecond'),
+            'recipients' => $this->recipients,
+            'stream' => $this->stream,
         ];
     }
 
@@ -66,6 +78,8 @@ final readonly class Envelope
             payload: (array) ($data['payload'] ?? []),
             headers: (array) ($data['headers'] ?? []),
             emittedAt: CarbonImmutable::parse((string) $data['emitted_at']),
+            recipients: array_values(array_map(strval(...), (array) ($data['recipients'] ?? []))),
+            stream: (string) ($data['stream'] ?? 'default'),
         );
     }
 

@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Modulith\Console\Commands;
 
 use Illuminate\Console\Command;
-use Modulith\Contracts\Bus;
+use Modulith\Contracts\Stream\Bus;
 use Modulith\Events\ShadowWanted;
-use Modulith\Services\ModuleRegistry;
-use Modulith\Services\ShadowRegistry;
+use Modulith\Services\Modules\ModuleRegistry;
+use Modulith\Services\Shadows\ShadowRegistry;
 
 /** Run by a module keeping copies: asks the owner of each source table to announce what it holds. */
 final class WantShadows extends Command
@@ -21,9 +21,10 @@ final class WantShadows extends Command
     {
         foreach ($catalog->localShadows() as $shadow) {
             $keeper = $registry->forClass($shadow);
+            $owner = $registry->get($shadow::owner());
 
             if ($keeper !== null) {
-                $bus->emit(new ShadowWanted($keeper->name, $shadow::sourceTable()));
+                $bus->emit(new ShadowWanted($keeper->name, $owner->name, $shadow::sourceTable()));
                 $this->line("→ {$keeper->name} wants {$shadow::sourceTable()}");
             }
         }

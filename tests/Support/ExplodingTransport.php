@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modulith\Tests\Support;
 
-use Modulith\Contracts\Transport;
+use Modulith\Contracts\Stream\Transport;
 use Modulith\Data\Envelope;
 use RuntimeException;
 

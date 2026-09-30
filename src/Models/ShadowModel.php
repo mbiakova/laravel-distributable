@@ -4,19 +4,21 @@ declare(strict_types=1);
 
 namespace Modulith\Models;
 
-use Illuminate\Database\Eloquent\Model as BaseModel;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Modulith\Traits\ResolvesModule;
 
 /**
  * A local, read-only copy of another module's rows: same key as the source row, soft-deleted when
  * the source is, written only through sync(). The owning module declares the shape once in an
- * abstract subclass; each module keeping a copy extends it in its own namespace, so the copy is a
- * table of the keeper's database, named {keeper}_{source table}.
+ * abstract subclass in its foundation; each module keeping a copy extends it in its own namespace,
+ * so the copy is a table of the keeper's database, named {keeper}_{source table}.
  *
  * @phpstan-consistent-constructor
  */
 abstract class ShadowModel extends Model
 {
+    use ResolvesModule;
     use SoftDeletes;
 
     public $incrementing = false;
@@ -27,14 +29,16 @@ abstract class ShadowModel extends Model
 
     private bool $syncing = false;
 
-    /** @return class-string<BaseModel> the source model this copy mirrors */
-    abstract public static function source(): string;
+    /** The module owning the source table, e.g. `iam`. */
+    abstract public static function owner(): string;
 
-    public static function sourceTable(): string
+    /** The source table this copy mirrors, e.g. `iam_users`. */
+    abstract public static function sourceTable(): string;
+
+    /** Written by a package handler that serves every keeper at once: the keeper is pinned here, not by the context. */
+    public function getConnectionName(): ?string
     {
-        $source = static::source();
-
-        return (new $source)->getTable();
+        return $this->module->connection();
     }
 
     public function getTable(): string

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Modulith\Console\Commands;
 
 use Illuminate\Console\Command;
-use Modulith\Services\ModuleRegistry;
-use Modulith\Services\Outbox\Relay;
+use Modulith\Services\Modules\ModuleRegistry;
+use Modulith\Services\Stream\Outbox\Relay;
 
 /**
  * The publisher role: the only process that puts outbox rows on the wire. One per module set —

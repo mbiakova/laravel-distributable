@@ -6,28 +6,40 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Transport
+    | Streams
     |--------------------------------------------------------------------------
-    | The stream events travel on, whether modules share a process or not.
-    | `redis` is Redis Streams, `queue` a Laravel queue connection (no Redis
-    | needed), `array` an in-memory stream for tests, `null` drops everything.
-    | Any other name resolves through a creator registered on the transport
-    | manager with extend() — kafka, amqp, or an existing package.
+    | Named streams, like queue connections: each has a driver and that
+    | driver's options. An event travels on the stream its stream() method
+    | names, or on the default one. A module declares its own streams in its
+    | config/streamer.php fragment. Drivers: `redis` (Redis Streams), `queue`
+    | (a Laravel queue connection, no Redis needed), `array` (in memory, for
+    | tests), `null` (drops everything). Any other driver resolves through a
+    | creator registered on the transport manager with extend().
     */
 
-    'transport' => env('MODULITH_STREAMER_TRANSPORT', 'redis'),
+    'default' => env('MODULITH_STREAMER_STREAM', 'default'),
 
-    /*
-    |--------------------------------------------------------------------------
-    | Transactional outbox
-    |--------------------------------------------------------------------------
-    | On: an emission is written to `event_publications` inside the business
-    | transaction, then put on the wire in order by the publisher process
-    | (modulith:events:publish) — no dual write, and a module keeps the same
-    | event semantics once it is promoted to its own service.
-    */
+    'streams' => [
 
-    'outbox' => env('MODULITH_STREAMER_OUTBOX', false),
+        // Nothing is trimmed on write: modulith:events:trim drops only what every consumer group acknowledged.
+        'default' => [
+            'driver' => env('MODULITH_STREAMER_DRIVER', 'redis'),
+            'outbox' => env('MODULITH_STREAMER_OUTBOX', false), // true: written with the business transaction, published by modulith:events:publish
+            'connection' => env('MODULITH_STREAMER_REDIS_CONNECTION', 'default'),
+            'prefix' => 'modulith:events:',
+            'block' => 5_000,        // read block window, ms
+            'count' => 50,           // entries per read
+            'claim_after' => 60_000, // reclaim entries a dead consumer left pending, ms
+        ],
+
+        // 'jobs' => [
+        //     'driver' => 'queue',
+        //     'connection' => env('MODULITH_STREAMER_QUEUE_CONNECTION'),
+        //     'prefix' => 'modulith-events-',
+        //     'sleep' => 1,         // seconds to wait when the queue is empty
+        // ],
+
+    ],
 
     /*
     |--------------------------------------------------------------------------
@@ -55,20 +67,5 @@ return [
     */
 
     'propagate' => [],
-
-    // Nothing is trimmed on write: modulith:events:trim drops only what every consumer group acknowledged.
-    'redis' => [
-        'connection' => env('MODULITH_STREAMER_REDIS_CONNECTION', 'default'),
-        'prefix' => 'modulith:events:',
-        'block' => 5_000,        // read block window, ms
-        'count' => 50,           // entries per read
-        'claim_after' => 60_000, // reclaim entries a dead consumer left pending, ms
-    ],
-
-    'queue' => [
-        'connection' => env('MODULITH_STREAMER_QUEUE_CONNECTION'),
-        'prefix' => 'modulith-events-',
-        'sleep' => 1,            // seconds to wait when the queue is empty
-    ],
 
 ];

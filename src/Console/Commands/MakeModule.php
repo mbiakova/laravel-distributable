@@ -1,0 +1,81 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modulith\Console\Commands;
+
+use Illuminate\Console\Command;
+use Illuminate\Support\Str;
+use Modulith\Config\Modules;
+use Modulith\Data\Module;
+
+final class MakeModule extends Command
+{
+    protected $signature = 'modulith:make-module
+        {name : The module name, snake_case (e.g. point_of_sale)}
+        {--database : Give the module its own database connections}';
+
+    protected $description = 'Create a module and its foundation directory.';
+
+    public function handle(Modules $config): int
+    {
+        $module = Module::fromName((string) $this->argument('name'), $config->getModulesNamespace(), $config->getModulesPath());
+
+        if (is_dir($module->path())) {
+            $this->components->error("Module [{$module->name}] already exists at {$module->path()}.");
+
+            return self::FAILURE;
+        }
+
+        $studly = Str::studly($module->name);
+        $providerClass = class_basename($module->provider);
+
+        $files = [
+            'modulith.php' => "<?php\n\nreturn [];\n",
+            "app/Providers/{$providerClass}.php" => <<<PHP
+                <?php
+
+                declare(strict_types=1);
+
+                namespace {$module->namespace}\\Providers;
+
+                use Modulith\\Providers\\ModuleServiceProvider;
+
+                final class {$providerClass} extends ModuleServiceProvider {}
+
+                PHP,
+            'routes/api.php' => "<?php\n\ndeclare(strict_types=1);\n\nuse Illuminate\\Support\\Facades\\Route;\n",
+        ];
+
+        if ($this->option('database')) {
+            $files['config/database.php'] = <<<PHP
+                <?php
+
+                declare(strict_types=1);
+
+                return ['connections' => [
+                    '{$module->name}' => ['driver' => env('DB_CONNECTION', 'pgsql'), 'database' => '{$module->name}', 'username' => '{$module->name}_app'],
+                    '{$module->name}_owner' => ['driver' => env('DB_CONNECTION', 'pgsql'), 'database' => '{$module->name}', 'username' => '{$module->name}_owner'],
+                ]];
+
+                PHP;
+        }
+
+        foreach ($files as $path => $contents) {
+            $this->write($module->path().'/'.$path, $contents);
+        }
+
+        $foundation = $config->getFoundationPath().'/'.$studly.'/Contracts';
+        is_dir($foundation) || mkdir($foundation, 0755, true);
+
+        $this->components->info("Module [{$module->name}] created at {$module->path()}.");
+
+        return self::SUCCESS;
+    }
+
+    private function write(string $path, string $contents): void
+    {
+        is_dir(dirname($path)) || mkdir(dirname($path), 0755, true);
+        file_put_contents($path, $contents);
+    }
+}

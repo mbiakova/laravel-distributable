@@ -21,4 +21,16 @@ abstract class Event
     {
         return null;
     }
+
+    /** @return list<string> the only modules that handle it; empty for every module */
+    public function recipients(): array
+    {
+        return [];
+    }
+
+    /** The stream of streamer.streams it travels on; null for the default one. */
+    public function stream(): ?string
+    {
+        return null;
+    }
 }

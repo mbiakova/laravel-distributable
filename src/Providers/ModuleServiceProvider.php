@@ -8,12 +8,12 @@ use Illuminate\Console\Command;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider as BaseServiceProvider;
+use Modulith\Http\Middleware\SetModuleContext;
 use Modulith\Traits\ResolvesModule;
 
 /**
  * Base service provider a module extends to get, without manual wiring: config merging
- * (each {module}/config/*.php deep-merges into the matching root config), migrations
- * ({module}/database/migrations),
+ * (each {module}/config/*.php deep-merges into the matching root config),
  * translations ({module}/lang, namespaced by the module name),
  * routes ({module}/routes/{name}.php, prefixed {module}/{name}) and console commands.
  * Registered only for local modules (ModulithServiceProvider follows WITH_MODULES), so a
@@ -31,7 +31,6 @@ abstract class ModuleServiceProvider extends BaseServiceProvider
     public function boot(): void
     {
         $this->loadModuleRoutes();
-        $this->loadModuleMigrations();
         $this->loadModuleTranslations();
         $this->registerModuleCommands();
     }
@@ -85,22 +84,11 @@ abstract class ModuleServiceProvider extends BaseServiceProvider
         // application defines one.
         foreach (glob($module->path().'/routes/*.php') ?: [] as $routeFile) {
             $name = basename($routeFile, '.php');
-            $route = Route::prefix($module->name.'/'.$name);
+            $middleware = $router->hasMiddlewareGroup($name) ? [$name] : [];
 
-            if ($router->hasMiddlewareGroup($name)) {
-                $route->middleware($name);
-            }
-
-            $route->group($routeFile);
-        }
-    }
-
-    private function loadModuleMigrations(): void
-    {
-        $migrationsPath = $this->module->path().'/database/migrations';
-
-        if (is_dir($migrationsPath)) {
-            $this->loadMigrationsFrom($migrationsPath);
+            Route::prefix($module->name.'/'.$name)
+                ->middleware([...$middleware, SetModuleContext::class.':'.$module->name])
+                ->group($routeFile);
         }
     }
 

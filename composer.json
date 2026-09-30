@@ -1,5 +1,5 @@
 {
-    "name": "mk-josias/laravel-modulith",
+    "name": "mbiakova/laravel-modulith",
     "description": "Modular monolith kernel for Laravel: self-describing modules with a database each, ordered events through a transactional outbox, and one codebase deployable as a single process or as per-module services.",
     "license": "MIT",
     "type": "library",

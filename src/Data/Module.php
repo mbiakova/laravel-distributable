@@ -25,7 +25,7 @@ final readonly class Module
      * Every convention derives from the name; a module has a database exactly when it declares
      * its connections in its own config/database.php.
      */
-    public static function fromName(string $name, string $modulesNamespace, string $modulesPath = 'modules'): self
+    public static function fromName(string $name, string $modulesNamespace, string $modulesPath = 'apps'): self
     {
         if (preg_match('/^[a-z][a-z0-9_]*$/', $name) !== 1) {
             throw ModuleException::invalidName($name);
@@ -43,6 +43,24 @@ final readonly class Module
             path: $path,
             hasDatabase: is_file($absolute.'/config/database.php'),
         );
+    }
+
+    /** @return array{name: string, namespace: string, provider: string, path: string, hasDatabase: bool} */
+    public function toArray(): array
+    {
+        return [
+            'name' => $this->name,
+            'namespace' => $this->namespace,
+            'provider' => $this->provider,
+            'path' => $this->path,
+            'hasDatabase' => $this->hasDatabase,
+        ];
+    }
+
+    /** @param array{name: string, namespace: string, provider: string, path: string, hasDatabase: bool} $data */
+    public static function fromArray(array $data): self
+    {
+        return new self(...$data);
     }
 
     /** Stored relative to the project root so a compiled registry stays portable across hosts. */

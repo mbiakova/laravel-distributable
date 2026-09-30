@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace Modulith\Console\Commands;
 
 use Illuminate\Console\Command;
-use Modulith\Contracts\Transport;
+use Modulith\Contracts\Stream\Transport;
 use Modulith\Data\Envelope;
-use Modulith\Services\Dispatcher;
-use Modulith\Services\ModuleRegistry;
+use Modulith\Services\Modules\ModuleRegistry;
+use Modulith\Services\Stream\Dispatcher;
+use Modulith\Services\Stream\TransportManager;
 
 /**
  * The consumer role: reads the envelopes published by every module and runs this module's
@@ -17,12 +18,15 @@ use Modulith\Services\ModuleRegistry;
  */
 final class ConsumeEvents extends Command
 {
-    protected $signature = 'modulith:events:consume {--module= : The consuming module (default: the only local one)}';
+    protected $signature = 'modulith:events:consume
+        {--module= : The consuming module (default: the only local one)}
+        {--stream= : The stream to read (default: streamer.default)}';
 
-    protected $description = 'Consume events from the transport and run this module handlers.';
+    protected $description = 'Consume events from a stream and run this module handlers.';
 
-    public function handle(ModuleRegistry $registry, Transport $transport, Dispatcher $dispatcher): int
+    public function handle(ModuleRegistry $registry, TransportManager $transports, Dispatcher $dispatcher): int
     {
+        $transport = $transports->stream($this->option('stream') !== null ? (string) $this->option('stream') : null);
         $consumer = $this->consumer($registry);
 
         if ($consumer === null) {
@@ -37,8 +41,10 @@ final class ConsumeEvents extends Command
 
         $this->stopGracefullyOnSignal($transport);
 
-        $transport->consume($consumer, $channels, function (Envelope $envelope) use ($dispatcher): void {
-            $dispatcher->dispatch($envelope);
+        $transport->consume($consumer, $channels, function (Envelope $envelope) use ($dispatcher, $consumer): void {
+            if ($envelope->isFor($consumer)) {
+                $dispatcher->dispatch($envelope);
+            }
         });
 
         return self::SUCCESS;

@@ -6,10 +6,10 @@ use Modulith\Tests\TestCase;
 
 uses(TestCase::class);
 
-use Modulith\Contracts\Source;
+use Modulith\Contracts\Modules\Source;
 use Modulith\Data\Module;
 use Modulith\Exceptions\ModuleException;
-use Modulith\Services\ModuleRegistry;
+use Modulith\Services\Modules\ModuleRegistry;
 
 /** @param list<string> $loadedModules */
 function registryLoading(array $loadedModules = ['*']): ModuleRegistry
@@ -19,8 +19,8 @@ function registryLoading(array $loadedModules = ['*']): ModuleRegistry
         public function modules(): array
         {
             return [
-                Module::fromName('iam', 'Modules'),
-                Module::fromName('analytics', 'Modules'),
+                Module::fromName('iam', 'Apps', 'apps'),
+                Module::fromName('analytics', 'Apps', 'apps'),
             ];
         }
     };
@@ -52,6 +52,6 @@ it('fails loudly on an unknown module name', function () {
 it('resolves the module owning a class from its namespace', function () {
     $registry = registryLoading();
 
-    expect($registry->forClass('Modules\Analytics\Models\Report')->name)->toBe('analytics')
+    expect($registry->forClass('Apps\Analytics\Models\Report')->name)->toBe('analytics')
         ->and($registry->forClass('Illuminate\Support\Str'))->toBeNull();
 });

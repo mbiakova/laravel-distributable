@@ -8,20 +8,22 @@ return [
     |--------------------------------------------------------------------------
     | Services
     |--------------------------------------------------------------------------
-    | Each module declares the contracts it serves in its own config/rpc.php,
-    | merged here: the local implementation is bound when the module runs in
-    | this process, the remote one — calling it over the network — otherwise.
-    |
-    |   IamService::class => [
-    |       'module' => 'iam',
-    |       'local' => LocalIamService::class,
-    |       'remote' => RemoteIamService::class,
-    |   ],
+    | Filled from each module's foundation/{Module}/rpc.php, which maps its
+    | contracts to their RpcService: `IamService::class => IamRpcService::class`.
+    | When the module runs here, its own {Module}\Services\{Contract} is bound
+    | instead.
     */
 
     'services' => [],
 
-    // Base URL of each module when it runs elsewhere: 'iam' => 'https://iam.internal'.
+    // Named transports, like queue connections; a driver other than `http` comes from RpcTransportManager::extend().
+    'default' => env('MODULITH_RPC_TRANSPORT', 'http'),
+
+    'transports' => [
+        'http' => ['driver' => 'http'],
+    ],
+
+    // Each module when it runs elsewhere: its base URL, or ['url' => …, 'transport' => 'grpc'].
     'hosts' => [],
 
     // Shared secret signing every call between modules, and how long a signature stays valid.

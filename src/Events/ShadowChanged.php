@@ -9,13 +9,23 @@ final class ShadowChanged extends Event
 {
     public const string NAME = 'modulith.shadow.changed';
 
-    /** @param array<string, mixed> $attributes */
+    /**
+     * @param  array<string, mixed>  $attributes
+     * @param  list<string>  $keepers  the only modules to update their copy; empty for all of them
+     */
     public function __construct(
         private readonly string $sourceModule,
         private readonly string $source,
         private readonly int|string $key,
         private readonly array $attributes,
+        private readonly array $keepers = [],
     ) {}
+
+    /** @return list<string> */
+    public function recipients(): array
+    {
+        return $this->keepers;
+    }
 
     public function name(): string
     {

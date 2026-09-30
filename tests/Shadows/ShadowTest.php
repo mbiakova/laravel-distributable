@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
+use Apps\Analytics\Models\UserShadow;
+use Apps\Iam\Models\User;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Modules\Analytics\Models\UserShadow;
-use Modules\Iam\Models\User;
 use Modulith\Tests\Support\ModuleAppTestCase;
 
 uses(ModuleAppTestCase::class);
@@ -22,7 +22,7 @@ beforeEach(function () {
         }
     }
 
-    $this->artisan('modulith:migrate')->assertSuccessful();
+    $this->artisan('migrate')->assertSuccessful();
 });
 
 function copies(): Builder
@@ -36,7 +36,7 @@ it('migrates the copy into the keeper database, named after the keeper', functio
 });
 
 it('keeps the copy in step with the source, deletion included', function () {
-    $user = User::query()->create(['name' => 'ada']);
+    $user = $this->inModule('iam', fn () => User::query()->create(['name' => 'ada']));
     $this->artisan('modulith:events:consume --module=analytics')->assertSuccessful();
 
     expect(copies()->where('id', $user->id)->value('name'))->toBe('ada');
@@ -57,8 +57,24 @@ it('refuses any write to a copy that does not come from the source', function ()
         ->and(copies()->count())->toBe(0);
 });
 
+it('leaves a copy alone when the announcement is addressed to another keeper', function () {
+    $user = $this->inModule('iam', fn () => User::query()->create(['name' => 'ada']));
+    $this->artisan('modulith:events:consume --module=analytics')->assertSuccessful();
+    DB::connection('iam')->table('iam_users')->where('id', $user->id)->update(['name' => 'grace']);
+
+    $this->artisan('modulith:shadows:announce iam_users --for=gateway')->assertSuccessful();
+    $this->artisan('modulith:events:consume --module=analytics')->assertSuccessful();
+
+    expect(copies()->where('id', $user->id)->value('name'))->toBe('ada');
+
+    $this->artisan('modulith:shadows:announce iam_users --for=analytics')->assertSuccessful();
+    $this->artisan('modulith:events:consume --module=analytics')->assertSuccessful();
+
+    expect(copies()->where('id', $user->id)->value('name'))->toBe('grace');
+});
+
 it('rebuilds a copy on demand: the keeper asks, the owner announces again', function () {
-    $user = User::query()->create(['name' => 'ada']);
+    $user = $this->inModule('iam', fn () => User::query()->create(['name' => 'ada']));
     copies()->delete();
 
     $this->artisan('modulith:shadows:want')->assertSuccessful();
