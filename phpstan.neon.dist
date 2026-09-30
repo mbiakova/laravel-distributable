@@ -1,0 +1,15 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 6
+
+    # Package code, plus the fixture module and test doubles — they are the consumer side that
+    # actually uses the package's traits and contracts, so analysing them covers both.
+    # The Pest files themselves are out: Pest binds $this inside closures at runtime, which
+    # static analysis cannot follow — running the suite is what verifies those.
+    paths:
+        - src
+        - database
+        - tests/Fixtures
+        - tests/Support

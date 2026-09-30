@@ -1,0 +1,72 @@
+{
+    "name": "mk-josias/laravel-modulith",
+    "description": "Modular monolith kernel for Laravel: self-describing modules with a database each, ordered events through a transactional outbox, and one codebase deployable as a single process or as per-module services.",
+    "license": "MIT",
+    "type": "library",
+    "keywords": [
+        "laravel",
+        "modular-monolith",
+        "modulith",
+        "modules",
+        "microservices",
+        "events",
+        "outbox"
+    ],
+    "authors": [
+        {
+            "name": "Josias Mekontso",
+            "email": "josiasmekontso.it@gmail.com"
+        }
+    ],
+    "require": {
+        "php": "^8.4",
+        "laravel/framework": "^12.0 || ^13.0"
+    },
+    "require-dev": {
+        "larastan/larastan": "^3.10",
+        "laravel/pint": "^1.0",
+        "orchestra/testbench": "^10.0 || ^11.0",
+        "pestphp/pest": "^3.0 || ^4.0"
+    },
+    "suggest": {
+        "ext-redis": "Required by the redis events transport (predis/predis works too)",
+        "laravel/octane": "High-throughput application server; the kernel also runs under plain FPM"
+    },
+    "autoload": {
+        "psr-4": {
+            "Modulith\\": "src/"
+        },
+        "files": [
+            "src/helpers.php"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modulith\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Modulith\\Providers\\ModulithServiceProvider"
+            ]
+        }
+    },
+    "scripts": {
+        "test": "pest",
+        "lint": "pint",
+        "analyse": "phpstan analyse --memory-limit=1G",
+        "check": [
+            "@lint",
+            "@analyse",
+            "@test"
+        ]
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "minimum-stability": "stable"
+}

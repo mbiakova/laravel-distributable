@@ -1,0 +1,37 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modulith\Exceptions;
+
+use RuntimeException;
+
+/** A module that cannot be found, named, declared or resolved. */
+final class ModuleException extends RuntimeException
+{
+    /** @param list<string> $known */
+    public static function notFound(string $name, array $known): self
+    {
+        return new self(sprintf(
+            'Unknown module [%s]. Known modules: %s.',
+            $name,
+            $known === [] ? '(none)' : implode(', ', $known),
+        ));
+    }
+
+    public static function invalidName(string $name): self
+    {
+        return new self("Invalid module name [{$name}]: expected lowercase snake_case.");
+    }
+
+    public static function duplicateName(string $name): self
+    {
+        return new self("Duplicate module name [{$name}] in the module source.");
+    }
+
+    /** A class the package needs to attach to a module lives outside every module namespace. */
+    public static function outsideModule(string $class): self
+    {
+        return new self("Cannot resolve the module of [{$class}]: it is not inside a module namespace.");
+    }
+}
