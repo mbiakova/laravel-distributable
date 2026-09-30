@@ -203,10 +203,17 @@ php artisan modulith:events:consume --module=analytics
 
 ### Declaring a module
 
-A directory of `modules/` is a module **when it carries a `modulith.php` file**. The file is a
-marker and returns `[]`; everything else follows from the directory name:
+A directory of the modules directory is a module **when it carries a `modulith.php` file**. The
+file is a marker and returns `[]`; everything else follows from the directory name. The modules
+directory and their root namespace are yours to choose:
 
-| | Module `Iam` |
+```php
+// config/modulith.php
+'modules_path'      => 'modules',   // e.g. 'src/Domains'
+'modules_namespace' => 'Modules',   // e.g. 'Domains'
+```
+
+| | Module `Iam`, with the defaults |
 |---|---|
 | name | `iam` — the directory in snake_case, `^[a-z][a-z0-9_]*$` |
 | namespace | `Modules\Iam`, autoloaded from `modules/Iam/app` — no entry in `composer.json` |
