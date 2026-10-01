@@ -62,12 +62,12 @@ it('leaves a copy alone when the announcement is addressed to another keeper', f
     $this->artisan('modulith:events:consume --module=analytics')->assertSuccessful();
     DB::connection('iam')->table('iam_users')->where('id', $user->id)->update(['name' => 'grace']);
 
-    $this->artisan('modulith:shadows:announce iam_users --for=gateway')->assertSuccessful();
+    $this->artisan('modulith:shadows:announce iam_users --keepers=gateway')->assertSuccessful();
     $this->artisan('modulith:events:consume --module=analytics')->assertSuccessful();
 
     expect(copies()->where('id', $user->id)->value('name'))->toBe('ada');
 
-    $this->artisan('modulith:shadows:announce iam_users --for=analytics')->assertSuccessful();
+    $this->artisan('modulith:shadows:announce iam_users --keepers=analytics')->assertSuccessful();
     $this->artisan('modulith:events:consume --module=analytics')->assertSuccessful();
 
     expect(copies()->where('id', $user->id)->value('name'))->toBe('grace');
@@ -82,4 +82,14 @@ it('rebuilds a copy on demand: the keeper asks, the owner announces again', func
     $this->artisan('modulith:events:consume --module=analytics')->assertSuccessful();
 
     expect(copies()->where('id', $user->id)->value('name'))->toBe('ada');
+});
+
+it('asks only for the keepers and sources named', function () {
+    $this->artisan('modulith:shadows:want --keepers=gateway')->doesntExpectOutputToContain('wants')->assertSuccessful();
+
+    $this->artisan('modulith:shadows:want --keepers=analytics --sources=iam_users')
+        ->expectsOutput('→ analytics wants iam_users')
+        ->assertSuccessful();
+
+    $this->artisan('modulith:shadows:want --sources=other_table')->doesntExpectOutputToContain('wants')->assertSuccessful();
 });

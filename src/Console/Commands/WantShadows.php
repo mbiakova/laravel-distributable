@@ -13,20 +13,28 @@ use Modulith\Services\Shadows\ShadowRegistry;
 /** Run by a module keeping copies: asks the owner of each source table to announce what it holds. */
 final class WantShadows extends Command
 {
-    protected $signature = 'modulith:shadows:want';
+    protected $signature = 'modulith:shadows:want
+        {--keepers=* : Only these modules ask for their copies (default: every local keeper)}
+        {--sources=* : Only these source tables (default: every one they copy)}';
 
-    protected $description = 'Ask the owners of every source table copied here to announce their rows.';
+    protected $description = 'Ask the owners of the source tables copied here to announce their rows.';
 
     public function handle(ShadowRegistry $catalog, ModuleRegistry $registry, Bus $bus): int
     {
+        $keepers = (array) $this->option('keepers');
+        $sources = (array) $this->option('sources');
+
         foreach ($catalog->localShadows() as $shadow) {
             $keeper = $registry->forClass($shadow);
-            $owner = $registry->get($shadow::owner());
 
-            if ($keeper !== null) {
-                $bus->emit(new ShadowWanted($keeper->name, $owner->name, $shadow::sourceTable()));
-                $this->line("→ {$keeper->name} wants {$shadow::sourceTable()}");
+            if ($keeper === null
+                || ($keepers !== [] && ! in_array($keeper->name, $keepers, true))
+                || ($sources !== [] && ! in_array($shadow::sourceTable(), $sources, true))) {
+                continue;
             }
+
+            $bus->emit(new ShadowWanted($keeper->name, $registry->get($shadow::owner())->name, $shadow::sourceTable()));
+            $this->line("→ {$keeper->name} wants {$shadow::sourceTable()}");
         }
 
         return self::SUCCESS;

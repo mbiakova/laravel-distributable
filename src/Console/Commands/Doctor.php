@@ -37,6 +37,10 @@ final class Doctor extends Command
             }
         }
 
+        if ($rpc->getServices() !== [] && $rpc->getSecret() === '') {
+            $problems[] = 'Modules serve RPC contracts but rpc.secret is empty: set MODULITH_RPC_SECRET or APP_KEY.';
+        }
+
         foreach ($boundaries->violations() as $violation) {
             $problems[] = "Boundary crossed: {$violation}";
         }

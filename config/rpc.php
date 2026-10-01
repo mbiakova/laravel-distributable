@@ -26,8 +26,8 @@ return [
     // Each module when it runs elsewhere: its base URL, or ['url' => …, 'transport' => 'grpc'].
     'hosts' => [],
 
-    // Shared secret signing every call between modules, and how long a signature stays valid.
-    'secret' => env('MODULITH_RPC_SECRET', ''),
+    // Signs every call between modules; the caller and the called process must share it, so it falls back to APP_KEY.
+    'secret' => env('MODULITH_RPC_SECRET', env('APP_KEY', '')),
     'signature_ttl' => 30,
 
 ];

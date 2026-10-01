@@ -49,6 +49,25 @@ it('fails on a module whose provider does not exist, and names it', function () 
         ->assertFailed();
 });
 
+it('fails when modules serve RPC contracts and no secret signs the calls', function () {
+    config()->set('rpc.secret', '');
+
+    $this->artisan('modulith:doctor')
+        ->expectsOutputToContain('rpc.secret is empty')
+        ->assertFailed();
+});
+
+it('falls back to the application key for the RPC secret', function () {
+    putenv('MODULITH_RPC_SECRET');
+    putenv('APP_KEY=app-key-value');
+
+    try {
+        expect((require dirname(__DIR__, 2).'/config/rpc.php')['secret'])->toBe('app-key-value');
+    } finally {
+        putenv('APP_KEY');
+    }
+});
+
 it('passes once every module can run', function () {
     $withoutGateway = new class($this->app->make(ManifestSource::class)) implements Source
     {

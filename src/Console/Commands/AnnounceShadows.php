@@ -12,7 +12,7 @@ final class AnnounceShadows extends Command
 {
     protected $signature = 'modulith:shadows:announce
         {source : The source table, e.g. iam_users}
-        {--for=* : Only these keeper modules update their copy (default: all of them)}';
+        {--keepers=* : Only these modules update their copy (default: every one keeping it)}';
 
     protected $description = 'Announce every row of a source table to the modules keeping a copy of it.';
 
@@ -26,7 +26,7 @@ final class AnnounceShadows extends Command
             return self::FAILURE;
         }
 
-        $this->line('→ announced '.$source->announceAll(keepers: array_values(array_map(strval(...), (array) $this->option('for')))));
+        $this->line('→ announced '.$source->announceAll(keepers: array_values(array_map(strval(...), (array) $this->option('keepers')))));
 
         return self::SUCCESS;
     }
