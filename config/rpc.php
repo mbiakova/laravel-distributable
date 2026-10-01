@@ -8,10 +8,8 @@ return [
     |--------------------------------------------------------------------------
     | Services
     |--------------------------------------------------------------------------
-    | Filled from each module's foundation/{Module}/rpc.php, which maps its
-    | contracts to their RpcService: `IamService::class => IamRpcService::class`.
-    | When the module runs here, its own {Module}\Services\{Contract} is bound
-    | instead.
+    | Filled at boot by the application's FoundationServiceProvider, from its
+    | $rpc map: each contract with its module and its RpcService.
     */
 
     'services' => [],

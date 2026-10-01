@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modulith\Services\Modules;
 
+use Modulith\Config\Modules;
 use Modulith\Data\Module;
 use Modulith\Services\Shadows\ShadowRegistry;
 
@@ -16,6 +17,7 @@ final readonly class ModuleMigrations
     public function __construct(
         private ModuleRegistry $registry,
         private ShadowRegistry $shadows,
+        private Modules $config,
     ) {}
 
     /** @return list<string> the application's migrations, plus those of the modules that have no database of their own */
@@ -45,7 +47,7 @@ final readonly class ModuleMigrations
     }
 
     /**
-     * The shadow migrations the owners of the copies this module keeps publish in database/shadows/.
+     * The migrations of the copies this module keeps, published by their owners in foundation/{Owner}/database/shadows/.
      *
      * @return list<string>
      */
@@ -59,7 +61,7 @@ final readonly class ModuleMigrations
             }
 
             $owner = $this->registry->get($shadow::owner());
-            $files = [...$files, ...(glob($owner->path().'/database/shadows/*_'.$shadow::sourceTable().'_shadow*.php') ?: [])];
+            $files = [...$files, ...(glob($this->config->getFoundationPath($owner).'/database/shadows/*_'.$shadow::sourceTable().'_shadow*.php') ?: [])];
         }
 
         sort($files);

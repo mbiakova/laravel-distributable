@@ -172,13 +172,19 @@ final class ModulithServiceProvider extends BaseServiceProvider
     {
         $registry = $this->app->make(ModuleRegistry::class);
         $this->autoloadModules($registry);
-        $this->bindModuleServices($registry);
 
         foreach ($registry->local() as $module) {
             // class_exists keeps the app bootable while a module's provider does not exist yet.
             if (class_exists($module->provider)) {
                 $this->app->register($module->provider);
             }
+        }
+
+        // After the modules: it binds a contract to its RpcService only where no local module answered.
+        $foundation = $this->app->make(Modules::class)->getFoundationNamespace().'\\FoundationServiceProvider';
+
+        if (class_exists($foundation)) {
+            $this->app->register($foundation);
         }
     }
 
@@ -195,38 +201,6 @@ final class ModulithServiceProvider extends BaseServiceProvider
         }
 
         $loader->register();
-    }
-
-    /**
-     * Binds each contract a module's foundation/{Module}/rpc.php declares: to the module's own
-     * {Module}\Services\{Contract} when it runs here, to the declared RpcService otherwise.
-     */
-    private function bindModuleServices(ModuleRegistry $registry): void
-    {
-        $services = $this->app->make(Rpc::class)->getServices();
-        $foundation = $this->app->make(Modules::class)->getFoundationPath();
-
-        foreach ($registry->all() as $module) {
-            $file = $foundation.'/'.basename($module->path()).'/rpc.php';
-
-            if (is_file($file)) {
-                /** @var array<class-string, class-string> $declared */
-                $declared = require $file;
-
-                foreach ($declared as $contract => $rpc) {
-                    $services[$contract] = ['module' => $module->name, 'rpc' => $rpc];
-                }
-            }
-        }
-
-        // Every module's contracts, running here or not: what modulith:doctor and the app read back.
-        $this->app['config']->set('rpc.services', $services);
-
-        foreach ($services as $contract => $service) {
-            $local = $registry->get($service['module'])->namespace.'\\Services\\'.class_basename($contract);
-
-            $this->app->bind($contract, $registry->isLocal($service['module']) && class_exists($local) ? $local : $service['rpc']);
-        }
     }
 
     public function boot(): void

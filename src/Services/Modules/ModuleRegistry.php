@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modulith\Services\Modules;
 
+use Illuminate\Support\Str;
 use Modulith\Contracts\Modules\Source;
 use Modulith\Data\Module;
 use Modulith\Exceptions\ModuleException;
@@ -60,6 +61,16 @@ final class ModuleRegistry
         }
 
         return $best;
+    }
+
+    /** The module a foundation class belongs to: Foundation\Iam\… is iam's; null outside the foundation. */
+    public function forFoundationClass(string $class, string $foundationNamespace): ?Module
+    {
+        if (! str_starts_with($class, $foundationNamespace.'\\')) {
+            return null;
+        }
+
+        return $this->find(Str::snake(Str::before(Str::after($class, $foundationNamespace.'\\'), '\\')));
     }
 
     public function isLocal(string $name): bool

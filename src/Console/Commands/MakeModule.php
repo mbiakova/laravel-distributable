@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modulith\Console\Commands;
 
 use Illuminate\Console\Command;
-use Illuminate\Support\Str;
 use Modulith\Config\Modules;
 use Modulith\Data\Module;
 
@@ -27,7 +26,6 @@ final class MakeModule extends Command
             return self::FAILURE;
         }
 
-        $studly = Str::studly($module->name);
         $providerClass = class_basename($module->provider);
 
         $files = [
@@ -65,7 +63,7 @@ final class MakeModule extends Command
             $this->write($module->path().'/'.$path, $contents);
         }
 
-        $foundation = $config->getFoundationPath().'/'.$studly.'/Contracts';
+        $foundation = $config->getFoundationPath($module).'/Contracts';
         is_dir($foundation) || mkdir($foundation, 0755, true);
 
         $this->components->info("Module [{$module->name}] created at {$module->path()}.");

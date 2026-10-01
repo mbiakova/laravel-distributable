@@ -23,9 +23,16 @@ abstract class ModuleServiceProvider extends BaseServiceProvider
 {
     use ResolvesModule;
 
+    /** @var array<class-string, class-string> the foundation contracts this module answers itself, when it runs here */
+    protected array $services = [];
+
     public function register(): void
     {
         $this->mergeModuleConfigs();
+
+        foreach ($this->services as $contract => $implementation) {
+            $this->app->bind($contract, $implementation);
+        }
     }
 
     public function boot(): void

@@ -6,7 +6,6 @@ namespace Modulith\Services\Rpc;
 
 use Closure;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Str;
 use Modulith\Config\Modules;
 use Modulith\Contracts\Rpc\RpcTransport;
 use Modulith\Data\Module;
@@ -22,13 +21,10 @@ abstract class RpcService
     /** The module this service calls, read from its foundation namespace. */
     public Module $module {
         get {
-            $root = app(Modules::class)->getFoundationNamespace().'\\';
+            $root = app(Modules::class)->getFoundationNamespace();
 
-            if (! str_starts_with(static::class, $root)) {
-                throw ModuleException::outsideFoundation(static::class, $root);
-            }
-
-            return app(ModuleRegistry::class)->get(Str::snake(Str::before(Str::after(static::class, $root), '\\')));
+            return app(ModuleRegistry::class)->forFoundationClass(static::class, $root)
+                ?? throw ModuleException::outsideFoundation(static::class, $root);
         }
     }
 

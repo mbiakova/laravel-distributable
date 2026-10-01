@@ -78,10 +78,11 @@ When the application boots, the package:
 
 1. finds the modules (each directory of `apps/` that contains a `modulith.php` file) and
    autoloads them under `Apps\{Module}\`;
-2. binds each RPC contract to the module's own implementation if the module runs in this process,
-   or to its RPC service if it runs elsewhere;
-3. registers the service provider of every module this process runs. The provider merges the
-   module's config files, loads its routes, translations and commands.
+2. registers the service provider of every module this process runs. The provider merges the
+   module's config files, loads its routes, translations and commands, and binds the contracts
+   the module answers itself;
+3. registers the foundation's service provider, which binds every other RPC contract to the
+   `RpcService` that calls its module over the network.
 
 A module that runs in another process has no config, routes or handlers here. Only its RPC
 contracts are bound.
@@ -145,11 +146,13 @@ apps/Iam/
 ├── database/migrations/
 └── routes/api.php                    served under /iam/api/…
 
-foundation/Iam/                       Foundation\Iam\, what iam shares with the other modules
-├── Contracts/IamService.php
-├── Services/IamRpcService.php        how another process calls iam
-├── Shadows/UserShadow.php
-└── rpc.php                           IamService::class => IamRpcService::class
+foundation/
+├── FoundationServiceProvider.php     maps each contract to its RpcService
+└── Iam/                              Foundation\Iam\, what iam shares with the other modules
+    ├── Contracts/IamService.php
+    ├── Services/IamRpcService.php    how another process calls iam
+    ├── Shadows/UserShadow.php
+    └── database/shadows/             the migration of the copies of iam's tables
 ```
 
 ```php
@@ -565,10 +568,34 @@ directory:
 
 ```
 foundation/Iam/Contracts/IamService.php      the contract
-foundation/Iam/Services/IamRpcService.php    extends RpcService, bound when iam runs elsewhere
-foundation/Iam/rpc.php                        IamService::class => IamRpcService::class
-apps/Iam/app/Services/IamService.php         implements the contract, bound when iam runs here
+foundation/Iam/Services/IamRpcService.php    extends RpcService, calls iam over the network
+foundation/FoundationServiceProvider.php     binds IamService to IamRpcService, unless iam runs here
+apps/Iam/app/Services/IamService.php         implements the contract with iam's own data
+apps/Iam/app/Providers/IamServiceProvider    binds IamService to it when iam runs here
 apps/Iam/routes/rpc.php                      answers the calls, under /iam/rpc/…
+```
+
+The foundation has one service provider, which the package registers for you. It lists the
+contracts and their `RpcService`, and binds a contract only if no module has bound it already.
+A module that runs in this process binds its own implementation in its provider, so that one is
+used.
+
+```php
+// foundation/FoundationServiceProvider.php
+final class FoundationServiceProvider extends \Modulith\Providers\FoundationServiceProvider
+{
+    protected array $rpc = [
+        IamService::class => IamRpcService::class,
+    ];
+}
+
+// apps/Iam/app/Providers/IamServiceProvider.php
+final class IamServiceProvider extends \Modulith\Providers\ModuleServiceProvider
+{
+    protected array $services = [
+        \Foundation\Iam\Contracts\IamService::class => \Apps\Iam\Services\IamService::class,
+    ];
+}
 ```
 
 ```php
@@ -581,10 +608,7 @@ final class IamRpcService extends \Modulith\Services\Rpc\RpcService implements I
     }
 }
 
-// foundation/Iam/rpc.php
-return [IamService::class => IamRpcService::class];
-
-// apps/Iam/app/Services/IamService.php, found by convention: {Module}\Services\{Contract}
+// apps/Iam/app/Services/IamService.php
 final class IamService implements \Foundation\Iam\Contracts\IamService
 {
     public function findUser(int $id): ?array { /* query iam's database */ }
@@ -657,7 +681,7 @@ abstract class UserShadow extends \Modulith\Models\ShadowModel
 final class UserShadow extends \Foundation\Iam\Shadows\UserShadow {}
 ```
 
-iam publishes the migration of the copy's table in `apps/Iam/database/shadows/`, extending
+iam publishes the migration of the copy's table in `foundation/Iam/database/shadows/`, extending
 `Modulith\Migrations\ShadowMigration`. `migrate` runs it in the database of every module that keeps
 a copy. A copy always writes to the database of the module that keeps it.
 
@@ -723,7 +747,7 @@ Stream options, by driver:
 
 | Key | Default | |
 |---|---|---|
-| `services` | `[]` | contract → `module` and `rpc` service, filled from each `foundation/{Module}/rpc.php` |
+| `services` | `[]` | contract → `module` and `rpc` service, filled at boot from the `FoundationServiceProvider` |
 | `default` | `env('MODULITH_RPC_TRANSPORT', 'http')` | transport used when a host doesn't name one |
 | `transports` | `http` | named transports, each with a `driver` and its options |
 | `hosts` | `[]` | `'iam' => 'https://iam.internal'`, or `['url' => …, 'transport' => 'grpc']` |
@@ -734,7 +758,7 @@ Stream options, by driver:
 
 ```
 src/
-├── Providers/          ModulithServiceProvider · ModuleServiceProvider
+├── Providers/          ModulithServiceProvider · ModuleServiceProvider · FoundationServiceProvider
 ├── Http/               Controllers/StatusController · Middleware/{VerifyRpcSignature, SetModuleContext}
 ├── Console/Commands/   MakeModule · ListModules · Doctor · CacheModules · ClearModules · PublishEvents · RepublishEvents · ConsumeEvents
 │                       TrimEvents · ExportEvents · ImportEvents · AnnounceShadows · WantShadows
