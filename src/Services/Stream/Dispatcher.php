@@ -13,6 +13,7 @@ use Modulith\Contracts\Stream\Handler;
 use Modulith\Contracts\Stream\Idempotent;
 use Modulith\Contracts\Stream\RedeliversEnvelopes;
 use Modulith\Data\Envelope;
+use Modulith\Data\Module;
 use Modulith\Events\ShadowChanged;
 use Modulith\Events\ShadowWanted;
 use Modulith\Exceptions\ConfigurationException;
@@ -44,14 +45,21 @@ final class Dispatcher
         private readonly TransportManager $transports,
     ) {}
 
-    public function dispatch(Envelope $envelope): void
+    /** With a $consumer, only its handlers run: a process running several modules has one consumer per module. */
+    public function dispatch(Envelope $envelope, ?Module $consumer = null): void
     {
         $guarded = $this->guarded($envelope->stream);
 
         foreach ($this->handlersFor($envelope->name) as $class) {
+            $owner = $this->registry->forClass($class);
+
+            if ($consumer !== null && $owner !== null && $owner->name !== $consumer->name) {
+                continue;
+            }
+
             $guarded && ! is_subclass_of($class, Idempotent::class)
                 ? $this->runGuarded($class, $envelope)
-                : $this->run($class, $envelope);
+                : $this->run($class, $envelope, $owner ?? $consumer);
         }
     }
 
@@ -82,7 +90,7 @@ final class Dispatcher
 
         $connection = $this->db->connection($module->connection());
 
-        $connection->transaction(function () use ($connection, $class, $envelope): void {
+        $connection->transaction(function () use ($connection, $class, $envelope, $module): void {
             $claimed = $connection->table('event_consumptions')->insertOrIgnore([
                 'event_id' => $envelope->id,
                 'handler' => $class,
@@ -93,12 +101,15 @@ final class Dispatcher
                 return; // already handled — the replay stops here
             }
 
-            $this->run($class, $envelope);
+            $this->run($class, $envelope, $module);
         });
     }
 
-    /** @param class-string $class */
-    private function run(string $class, Envelope $envelope): void
+    /**
+     * @param  class-string  $class
+     * @param  Module|null  $module  the handler's own module, or the consumer's for one of the package
+     */
+    private function run(string $class, Envelope $envelope, ?Module $module): void
     {
         $handler = $this->container->make($class);
 
@@ -107,7 +118,7 @@ final class Dispatcher
         }
 
         $this->context->within(
-            $this->registry->forClass($class),
+            $module,
             fn () => $this->withContext($envelope->headers, static fn () => $handler->handle($envelope->name, $envelope->payload)),
         );
     }

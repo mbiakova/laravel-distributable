@@ -23,7 +23,7 @@ beforeEach(function () {
         'queue' => 'default',
         'retry_after' => 90,
     ]);
-    Config::set('streamer.streams.default', ['driver' => 'queue', 'connection' => 'modulith']);
+    Config::set('modulith.events.streams.default', ['driver' => 'queue', 'connection' => 'modulith']);
 
     Schema::connection('iam')->create('jobs', function (Blueprint $table): void {
         $table->id();
@@ -36,11 +36,22 @@ beforeEach(function () {
     });
 });
 
-it('fans an envelope out to one queue per module with a database', function () {
+it('fans an envelope out to one queue per declared module, database or not', function () {
     $this->app->make(Bus::class)->emit(new UserRegistered(5, 'ada'));
 
     expect(DB::connection('iam')->table('jobs')->orderBy('queue')->pluck('queue')->all())
-        ->toBe(['modulith-default-analytics', 'modulith-default-iam']);
+        ->toBe(['modulith-default-analytics', 'modulith-default-gateway', 'modulith-default-iam']);
+});
+
+it('runs the shipped default stream on the application default queue connection once its driver is queue', function () {
+    $shipped = (require dirname(__DIR__, 2).'/config/modulith.php')['events']['streams']['default'];
+    Config::set('modulith.events.streams.default', [...$shipped, 'driver' => 'queue']);
+    Config::set('queue.default', 'modulith');
+
+    $this->app->make(Bus::class)->emit(new UserRegistered(5, 'ada'));
+
+    expect(DB::connection('iam')->table('jobs')->orderBy('queue')->pluck('queue')->all())
+        ->toBe(['modulith:events-analytics', 'modulith:events-gateway', 'modulith:events-iam']);
 });
 
 it('hands the consumer its own copy, then deletes it', function () {
@@ -56,5 +67,5 @@ it('hands the consumer its own copy, then deletes it', function () {
     });
 
     expect($received)->toBe([['id' => 5, 'name' => 'ada']])
-        ->and(DB::connection('iam')->table('jobs')->pluck('queue')->all())->toBe(['modulith-default-analytics']);
+        ->and(DB::connection('iam')->table('jobs')->pluck('queue')->all())->toBe(['modulith-default-analytics', 'modulith-default-gateway']);
 });

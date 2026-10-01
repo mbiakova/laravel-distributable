@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modulith\Contracts\Stream;
 
 /**
- * A module's reaction to an event, declared in its config/streamer.php listen map. The signature
+ * A module's reaction to an event, declared in the events.listen map of its config/modulith.php. The signature
  * is transport-neutral — a distributed consumer only ever has the name and the raw payload, so
  * the in-process driver hands over the same thing.
  */

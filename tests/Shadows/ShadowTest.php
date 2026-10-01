@@ -52,6 +52,18 @@ it('keeps the copy in step with the source, deletion included', function () {
     expect(copies()->where('id', $user->id)->value('deleted_at'))->not->toBeNull();
 });
 
+it('leaves the copies of analytics to the analytics consumer, when one process runs both modules', function () {
+    $user = $this->inModule('iam', fn () => User::query()->create(['name' => 'ada']));
+
+    $this->artisan('modulith:events:consume --module=iam')->assertSuccessful();
+
+    expect(copies()->count())->toBe(0);
+
+    $this->artisan('modulith:events:consume --module=analytics')->assertSuccessful();
+
+    expect(copies()->where('id', $user->id)->value('name'))->toBe('ada');
+});
+
 it('refuses any write to a copy that does not come from the source', function () {
     expect((new UserShadow)->forceFill(['id' => 1, 'name' => 'forged'])->save())->toBeFalse()
         ->and(copies()->count())->toBe(0);

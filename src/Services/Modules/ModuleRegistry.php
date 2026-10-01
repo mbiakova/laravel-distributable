@@ -5,24 +5,38 @@ declare(strict_types=1);
 namespace Modulith\Services\Modules;
 
 use Illuminate\Support\Str;
-use Modulith\Contracts\Modules\Source;
 use Modulith\Data\Module;
 use Modulith\Exceptions\ModuleException;
 
 /**
- * The process-level view of the modules: every module the source declares, and the ones this
- * process loads (WITH_MODULES). Being loaded is a fact about the process, never about a module.
+ * The process-level view of the modules: every module modulith.modules declares, and the ones
+ * this process loads (MODULITH_RUNS). Being loaded is a fact about the process, never about a module.
  */
 final class ModuleRegistry
 {
-    /** @var array<string, Module>|null */
-    private ?array $modules = null;
+    /** @var array<string, Module> */
+    private readonly array $modules;
 
-    /** @param list<string> $loadedModules ['*'] for every module, or their names */
+    /**
+     * @param  list<Module>  $modules
+     * @param  list<string>  $loadedModules  ['*'] for every module, or their names
+     */
     public function __construct(
-        private readonly Source $source,
+        array $modules,
         private readonly array $loadedModules = ['*'],
-    ) {}
+    ) {
+        $keyed = [];
+
+        foreach ($modules as $module) {
+            if (isset($keyed[$module->name])) {
+                throw ModuleException::duplicateName($module->name);
+            }
+
+            $keyed[$module->name] = $module;
+        }
+
+        $this->modules = $keyed;
+    }
 
     /** @return list<Module> */
     public function all(): array
@@ -88,20 +102,6 @@ final class ModuleRegistry
     /** @return array<string, Module> */
     private function modules(): array
     {
-        if ($this->modules !== null) {
-            return $this->modules;
-        }
-
-        $keyed = [];
-
-        foreach ($this->source->modules() as $module) {
-            if (isset($keyed[$module->name])) {
-                throw ModuleException::duplicateName($module->name);
-            }
-
-            $keyed[$module->name] = $module;
-        }
-
-        return $this->modules = $keyed;
+        return $this->modules;
     }
 }

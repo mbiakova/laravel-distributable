@@ -34,6 +34,16 @@ final class ModuleException extends RuntimeException
         return new self("[{$class}] is not under the foundation namespace [{$root}]: an RpcService lives in its module's foundation.");
     }
 
+    public static function notLocal(string $class, string $module): self
+    {
+        return new self("[{$class}] belongs to module [{$module}], which this process does not run (MODULITH_RUNS): go through its foundation contract or an event.");
+    }
+
+    public static function missingFolder(string $module, string $path): self
+    {
+        return new self("Module [{$module}] runs here (MODULITH_RUNS) but [{$path}] does not exist: was it purged from this image?");
+    }
+
     /** A class the package needs to attach to a module lives outside every module namespace. */
     public static function outsideModule(string $class): self
     {

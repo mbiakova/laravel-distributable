@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Apps\Iam\Actions\RegisterUser;
 use Apps\Iam\Models\User;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Modulith\Tests\Support\ModuleAppTestCase;
@@ -38,4 +39,12 @@ it('puts the application default back once the module code has run', function ()
     $this->inModule('iam', fn () => expect(DB::getDefaultConnection())->toBe('iam'));
 
     expect(DB::getDefaultConnection())->toBe($default);
+});
+
+it('keeps the database cache store on the application connection, whichever module uses it first', function () {
+    $default = DB::getDefaultConnection();
+
+    $connection = $this->inModule('iam', fn (): string => Cache::store('database')->getStore()->getConnection()->getName());
+
+    expect($connection)->toBe($default);
 });

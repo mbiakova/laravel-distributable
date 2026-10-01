@@ -6,18 +6,16 @@ namespace Modulith\Console\Commands;
 
 use Illuminate\Console\Command;
 use Modulith\Contracts\Stream\TrimsStreams;
-use Modulith\Services\Modules\ModuleRegistry;
 use Modulith\Services\Stream\TransportManager;
 
 final class TrimEvents extends Command
 {
     protected $signature = 'modulith:events:trim
-        {--module=* : Limit the trim to these emitters}
-        {--stream= : The stream to trim (default: streamer.default)}';
+        {--stream= : The stream to trim (default: modulith.events.stream)}';
 
     protected $description = 'Drop the stream entries every consumer has acknowledged.';
 
-    public function handle(ModuleRegistry $registry, TransportManager $transports): int
+    public function handle(TransportManager $transports): int
     {
         $transport = $transports->stream($this->option('stream') !== null ? (string) $this->option('stream') : null);
 
@@ -27,13 +25,7 @@ final class TrimEvents extends Command
             return self::SUCCESS;
         }
 
-        $only = (array) $this->option('module');
-
-        foreach ($registry->all() as $module) {
-            if ($only === [] || in_array($module->name, $only, true)) {
-                $this->line("{$module->name}: ".$transport->trim($module->name).' dropped');
-            }
-        }
+        $this->line($transport->trim().' dropped');
 
         return self::SUCCESS;
     }

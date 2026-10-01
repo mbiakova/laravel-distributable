@@ -6,38 +6,32 @@ namespace Modulith\Console\Commands;
 
 use Composer\Autoload\ClassLoader;
 use Illuminate\Console\Command;
-use Modulith\Config\Modules;
-use Modulith\Contracts\Modules\Source;
 use Modulith\Data\Module;
-use Modulith\Exceptions\ConfigurationException;
 use Modulith\Services\Modules\DiscoveryCache;
+use Modulith\Services\Modules\ModuleRegistry;
 use Modulith\Services\Shadows\ShadowRegistry;
 
-/** Run on deploy (php artisan optimize runs it): discovery is read from a file, not the tree. */
+/** Run on deploy (php artisan optimize runs it): what the module folders tell is read from a file. */
 final class CacheModules extends Command
 {
     protected $signature = 'modulith:cache';
 
-    protected $description = 'Cache the modules, their copies and their shadow sources.';
+    protected $description = 'Cache what the module folders tell: namespaces, databases, copies and shadow sources.';
 
-    public function handle(Modules $config, DiscoveryCache $cache, ShadowRegistry $shadows): int
+    public function handle(ModuleRegistry $registry, DiscoveryCache $cache, ShadowRegistry $shadows): int
     {
-        $source = $this->laravel->make($config->getSource());
-
-        if (! $source instanceof Source) {
-            throw ConfigurationException::invalidSource($source::class, Source::class);
-        }
-
-        $modules = $source->modules();
-        $this->autoload($modules);
+        // Only the modules this process runs are scanned: the classes of the others must not load here.
+        $local = $registry->local();
+        $this->autoload($local);
+        $names = array_map(static fn (Module $m): string => $m->name, $local);
 
         $cache->write([
-            'modules' => array_map(static fn (Module $module): array => $module->toArray(), $modules),
-            'shadows' => array_combine(array_map(static fn (Module $m): string => $m->name, $modules), array_map($shadows->scanShadows(...), $modules)),
-            'sources' => array_combine(array_map(static fn (Module $m): string => $m->name, $modules), array_map($shadows->scanSources(...), $modules)),
+            'modules' => array_map(static fn (Module $module): array => $module->toArray(), $registry->all()),
+            'shadows' => array_combine($names, array_map($shadows->scanShadows(...), $local)),
+            'sources' => array_combine($names, array_map($shadows->scanSources(...), $local)),
         ]);
 
-        $this->components->info('Modules cached: '.count($modules).'.');
+        $this->components->info('Modules cached: '.count($registry->all()).'.');
 
         return self::SUCCESS;
     }

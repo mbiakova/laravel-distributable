@@ -7,21 +7,14 @@ namespace Modulith\Config;
 use Illuminate\Contracts\Config\Repository;
 use Modulith\Exceptions\ConfigurationException;
 
-/** The rpc.* settings of the calls between modules; read live, never snapshotted. */
+/** The modulith.rpc.* settings, and each module's host; read live, never snapshotted. */
 final readonly class Rpc
 {
     public function __construct(private Repository $config) {}
 
-    /** @return array<class-string, array{module: string, rpc: class-string}> */
-    public function getServices(): array
-    {
-        /** @var array<class-string, array{module: string, rpc: class-string}> */
-        return (array) $this->config->get('rpc.services', []);
-    }
-
     public function hasHost(string $module): bool
     {
-        return array_key_exists($module, (array) $this->config->get('rpc.hosts', []));
+        return $this->config->get("modulith.modules.{$module}.host") !== null;
     }
 
     public function getHost(string $module): string
@@ -31,7 +24,7 @@ final readonly class Rpc
         return (string) (is_array($host) ? ($host['url'] ?? '') : $host);
     }
 
-    /** The transport a module's calls travel on: its host's `transport`, or rpc.default. */
+    /** The transport a module's calls travel on: its host's `transport`, or modulith.rpc.transport. */
     public function getTransportOf(string $module): string
     {
         $host = $this->host($module);
@@ -41,14 +34,14 @@ final readonly class Rpc
 
     public function getDefaultTransport(): string
     {
-        return (string) $this->config->get('rpc.default', 'http');
+        return (string) $this->config->get('modulith.rpc.transport', 'http');
     }
 
     /** @return array<string, mixed> */
     public function getTransport(string $name): array
     {
         /** @var array<string, array<string, mixed>> $transports */
-        $transports = (array) $this->config->get('rpc.transports', []);
+        $transports = (array) $this->config->get('modulith.rpc.transports', []);
 
         return $transports[$name] ?? throw ConfigurationException::unknownRpcTransport($name);
     }
@@ -56,19 +49,27 @@ final readonly class Rpc
     /** @return string|array<string, mixed> */
     private function host(string $module): string|array
     {
-        /** @var array<string, string|array<string, mixed>> $hosts */
-        $hosts = (array) $this->config->get('rpc.hosts', []);
+        /** @var string|array<string, mixed>|null $host */
+        $host = $this->config->get("modulith.modules.{$module}.host");
 
-        return $hosts[$module] ?? throw ConfigurationException::missingRpcHost($module);
+        return $host ?? throw ConfigurationException::missingRpcHost($module);
     }
 
     public function getSecret(): string
     {
-        return (string) $this->config->get('rpc.secret', '');
+        return (string) $this->config->get('modulith.rpc.secret', '');
+    }
+
+    /** Null is the application's default cache store. */
+    public function getCacheStore(): ?string
+    {
+        $store = $this->config->get('modulith.rpc.cache');
+
+        return is_string($store) && $store !== '' ? $store : null;
     }
 
     public function getSignatureTtl(): int
     {
-        return (int) $this->config->get('rpc.signature_ttl', 30);
+        return (int) $this->config->get('modulith.rpc.signature_ttl', 30);
     }
 }

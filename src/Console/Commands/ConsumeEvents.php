@@ -20,7 +20,7 @@ final class ConsumeEvents extends Command
 {
     protected $signature = 'modulith:events:consume
         {--module= : The consuming module (default: the only local one)}
-        {--stream= : The stream to read (default: streamer.default)}';
+        {--stream= : The stream to read (default: modulith.events.stream)}';
 
     protected $description = 'Consume events from a stream and run this module handlers.';
 
@@ -41,9 +41,11 @@ final class ConsumeEvents extends Command
 
         $this->stopGracefullyOnSignal($transport);
 
-        $transport->consume($consumer, $channels, function (Envelope $envelope) use ($dispatcher, $consumer): void {
+        $module = $registry->get($consumer);
+
+        $transport->consume($consumer, $channels, function (Envelope $envelope) use ($dispatcher, $consumer, $module): void {
             if ($envelope->isFor($consumer)) {
-                $dispatcher->dispatch($envelope);
+                $dispatcher->dispatch($envelope, $module);
             }
         });
 

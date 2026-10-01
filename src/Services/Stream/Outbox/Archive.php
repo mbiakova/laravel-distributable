@@ -47,7 +47,7 @@ final class Archive
             $fetched = $rows->count();
 
             if ($acknowledged) {
-                $rows = $rows->takeWhile(fn (stdClass $row): bool => $this->isAcknowledged($module, $row));
+                $rows = $rows->takeWhile(fn (stdClass $row): bool => $this->isAcknowledged($row));
             }
 
             foreach ($rows as $row) {
@@ -61,7 +61,7 @@ final class Archive
         return $exported;
     }
 
-    private function isAcknowledged(Module $module, stdClass $row): bool
+    private function isAcknowledged(stdClass $row): bool
     {
         $transport = $this->transports->stream((string) $row->stream);
 
@@ -69,7 +69,7 @@ final class Archive
             throw ConfigurationException::untrackedAcknowledgements((string) $row->stream);
         }
 
-        return $row->stream_id !== null && $transport->isAcknowledged($module->name, (string) $row->stream_id);
+        return $row->stream_id !== null && $transport->isAcknowledged((string) $row->stream_id);
     }
 
     /** Puts the file's rows back as pending publications of their emitter, in file order; a row already there is skipped. */

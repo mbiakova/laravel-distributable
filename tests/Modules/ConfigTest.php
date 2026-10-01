@@ -7,21 +7,22 @@ use Modulith\Tests\TestCase;
 uses(TestCase::class);
 
 use Modulith\Config\Modules;
-use Modulith\Services\Modules\ManifestSource;
 
 it('merges the modulith config with its defaults', function () {
-    expect(config('modulith.source'))->toBe(ManifestSource::class)
-        ->and(config('modulith.with'))->toBe('*')
-        ->and(config('modulith.modules_path'))->toBe('apps')
-        ->and(config('modulith.modules_namespace'))->toBe('Apps');
+    expect(config('modulith.modules'))->toBe([])
+        ->and(config('modulith.runs'))->toBe('*')
+        ->and(config('modulith.paths.modules'))->toBe('apps')
+        ->and(config('modulith.namespaces.modules'))->toBe('Apps')
+        ->and(config('modulith.events.streams.default.key'))->toBe('modulith:events')
+        ->and(config('modulith.rpc.transport'))->toBe('http');
 });
 
-it('reads WITH_MODULES as a list of module names, * standing for every module', function () {
-    config()->set('modulith.with', ' transactions , analytics ,');
+it('reads MODULITH_RUNS as a list of module names, * standing for every module', function () {
+    config()->set('modulith.runs', ' transactions , analytics ,');
 
     expect(app(Modules::class)->getLoadedModules())->toBe(['transactions', 'analytics']);
 
-    config()->set('modulith.with', '*');
+    config()->set('modulith.runs', '*');
 
     expect(app(Modules::class)->getLoadedModules())->toBe(['*']);
 });

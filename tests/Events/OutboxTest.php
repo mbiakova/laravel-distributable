@@ -23,8 +23,8 @@ use Modulith\Tests\Support\TrackingTransport;
 uses(ModuleAppTestCase::class);
 
 beforeEach(function () {
-    Config::set('streamer.streams.default.outbox', true);
-    Config::set('streamer.streams.default.driver', 'recording');
+    Config::set('modulith.events.streams.default.outbox', true);
+    Config::set('modulith.events.streams.default.driver', 'recording');
 
     $this->app->instance(RecordingTransport::class, new RecordingTransport);
     $this->app->make(TransportManager::class)->extend(
@@ -128,7 +128,7 @@ it('sweeps every local module database from the command', function () {
 });
 
 it('stops the pass at the first failure so no later row overtakes it', function () {
-    Config::set('streamer.streams.default.driver', 'exploding');
+    Config::set('modulith.events.streams.default.driver', 'exploding');
 
     $this->app->make(Bus::class)->emit(new UserRegistered(1, 'first'));
     $this->app->make(Bus::class)->emit(new UserRegistered(2, 'second'));
@@ -177,7 +177,7 @@ it('exports only what every consumer acknowledged, stopping at the first row not
     $path = tempnam(sys_get_temp_dir(), 'modulith-export-');
     $tracking = new TrackingTransport;
     $this->app->make(TransportManager::class)->extend('tracking', fn (): Transport => $tracking);
-    Config::set('streamer.streams.default.driver', 'tracking');
+    Config::set('modulith.events.streams.default.driver', 'tracking');
 
     foreach ([1, 2, 3] as $id) {
         $this->app->make(Bus::class)->emit(new UserRegistered($id, "user-{$id}"));

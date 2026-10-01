@@ -8,6 +8,7 @@ use Illuminate\Support\ServiceProvider as BaseServiceProvider;
 use Modulith\Config\Modules;
 use Modulith\Services\Modules\ModuleRegistry;
 use Modulith\Services\Rpc\RpcService;
+use Modulith\Services\Rpc\RpcServices;
 
 /**
  * Base of the application's {Foundation}\FoundationServiceProvider: it maps each contract to the
@@ -32,6 +33,6 @@ abstract class FoundationServiceProvider extends BaseServiceProvider
             $services[$contract] = ['module' => $registry->forFoundationClass($contract, $namespace)?->name, 'rpc' => $service];
         }
 
-        $this->app['config']->set('rpc.services', [...$this->app['config']->get('rpc.services', []), ...$services]);
+        $this->app->make(RpcServices::class)->add($services);
     }
 }

@@ -16,7 +16,7 @@ use Modulith\Traits\ResolvesModule;
  * (each {module}/config/*.php deep-merges into the matching root config),
  * translations ({module}/lang, namespaced by the module name),
  * routes ({module}/routes/{name}.php, prefixed {module}/{name}) and console commands.
- * Registered only for local modules (ModulithServiceProvider follows WITH_MODULES), so a
+ * Registered only for local modules (ModulithServiceProvider follows MODULITH_RUNS), so a
  * module's config lands only on the nodes that run it.
  */
 abstract class ModuleServiceProvider extends BaseServiceProvider

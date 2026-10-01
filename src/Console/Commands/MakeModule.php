@@ -29,7 +29,6 @@ final class MakeModule extends Command
         $providerClass = class_basename($module->provider);
 
         $files = [
-            'modulith.php' => "<?php\n\nreturn [];\n",
             "app/Providers/{$providerClass}.php" => <<<PHP
                 <?php
 
@@ -67,8 +66,25 @@ final class MakeModule extends Command
         is_dir($foundation) || mkdir($foundation, 0755, true);
 
         $this->components->info("Module [{$module->name}] created at {$module->path()}.");
+        $this->declare($module);
 
         return self::SUCCESS;
+    }
+
+    private function declare(Module $module): void
+    {
+        $config = config_path('modulith.php');
+        $contents = is_file($config) ? (string) file_get_contents($config) : '';
+        $declared = preg_replace("/('modules'\s*=>\s*\[)/", "$1\n        '{$module->name}' => [],", $contents, 1, $count);
+
+        if ($count === 1 && is_string($declared)) {
+            file_put_contents($config, $declared);
+            $this->components->info('Declared in config/modulith.php.');
+
+            return;
+        }
+
+        $this->components->warn("Declare it in config/modulith.php: 'modules' => ['{$module->name}' => []].");
     }
 
     private function write(string $path, string $contents): void

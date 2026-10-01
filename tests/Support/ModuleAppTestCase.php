@@ -19,13 +19,17 @@ abstract class ModuleAppTestCase extends TestCase
     {
         $config = $app->make(Repository::class);
 
-        $config->set('modulith.modules_path', dirname(__DIR__).'/Fixtures/apps');
-        $config->set('modulith.foundation_path', dirname(__DIR__).'/Fixtures/foundation');
+        $config->set('modulith.modules', [
+            'analytics' => [],
+            'gateway' => [],
+            'iam' => ['host' => 'http://iam.test'],
+        ]);
+        $config->set('modulith.paths.modules', dirname(__DIR__).'/Fixtures/apps');
+        $config->set('modulith.paths.foundation', dirname(__DIR__).'/Fixtures/foundation');
         $config->set('modulith.status_route', '/');
 
-        $config->set('streamer.streams.default.driver', 'array');
-        $config->set('rpc.secret', 'test-secret');
-        $config->set('rpc.hosts', ['iam' => 'http://iam.test']);
+        $config->set('modulith.events.streams.default.driver', 'array');
+        $config->set('modulith.rpc.secret', 'test-secret');
 
         // Root config the iam module's config/iam.php fragment merges over.
         $config->set('iam', [

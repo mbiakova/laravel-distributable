@@ -7,21 +7,21 @@ namespace Modulith\Config;
 use Illuminate\Contracts\Config\Repository;
 use Modulith\Exceptions\ConfigurationException;
 
-/** The streamer.* settings, typed and defaulted; read live, never snapshotted. */
+/** The modulith.events.* settings, typed and defaulted; read live, never snapshotted. */
 final readonly class Streamer
 {
     public function __construct(private Repository $config) {}
 
     public function getDefaultStream(): string
     {
-        return (string) $this->config->get('streamer.default', 'default');
+        return (string) $this->config->get('modulith.events.stream', 'default');
     }
 
     /** @return array<string, mixed> */
     public function getStream(string $name): array
     {
         /** @var array<string, array<string, mixed>> $streams */
-        $streams = $this->config->get('streamer.streams', []);
+        $streams = $this->config->get('modulith.events.streams', []);
 
         return $streams[$name] ?? throw ConfigurationException::unknownStream($name);
     }
@@ -38,12 +38,12 @@ final readonly class Streamer
 
     public function usesOutbox(string $stream): bool
     {
-        return (bool) $this->config->get("streamer.streams.{$stream}.outbox", false);
+        return (bool) $this->config->get("modulith.events.streams.{$stream}.outbox", false);
     }
 
     public function getGuard(): ?bool
     {
-        $guard = $this->config->get('streamer.guard');
+        $guard = $this->config->get('modulith.events.guard');
 
         return $guard === null ? null : (bool) $guard;
     }
@@ -52,7 +52,7 @@ final readonly class Streamer
     public function getHandlers(string $event): array
     {
         /** @var array<string, list<class-string>> $listen */
-        $listen = $this->config->get('streamer.listen', []);
+        $listen = $this->config->get('modulith.events.listen', []);
 
         // Direct key access: event names carry dots, which config dot-notation would split.
         return $listen[$event] ?? [];
@@ -61,6 +61,6 @@ final readonly class Streamer
     /** @return list<string> */
     public function getPropagate(): array
     {
-        return array_values(array_map(strval(...), (array) $this->config->get('streamer.propagate', [])));
+        return array_values(array_map(strval(...), (array) $this->config->get('modulith.events.propagate', [])));
     }
 }

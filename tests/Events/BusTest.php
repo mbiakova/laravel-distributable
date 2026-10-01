@@ -21,7 +21,7 @@ use Modulith\Tests\Support\RecordingTransport;
 uses(ModuleAppTestCase::class);
 
 beforeEach(function () {
-    Config::set('streamer.streams.default.driver', 'array');
+    Config::set('modulith.events.streams.default.driver', 'array');
     $this->app->singleton(Recorder::class);
 
     // A consumer-supplied transport, registered exactly as a real one would be.
@@ -51,7 +51,7 @@ it('ignores an event nobody listens to', function () {
 });
 
 it('drops every event on the null transport', function () {
-    Config::set('streamer.streams.default.driver', 'null');
+    Config::set('modulith.events.streams.default.driver', 'null');
 
     $this->app->make(Bus::class)->emit(new UserRegistered(5, 'lamp'));
     $this->artisan('modulith:events:consume --module=iam')->assertSuccessful();
@@ -60,7 +60,7 @@ it('drops every event on the null transport', function () {
 });
 
 it('stamps the envelope with the emitting module and a unique id', function () {
-    Config::set('streamer.streams.default.driver', 'recording');
+    Config::set('modulith.events.streams.default.driver', 'recording');
     $transport = $this->app->make(RecordingTransport::class);
 
     $bus = $this->app->make(Bus::class);
@@ -75,8 +75,8 @@ it('stamps the envelope with the emitting module and a unique id', function () {
 });
 
 it('carries only the configured context keys in the headers', function () {
-    Config::set('streamer.streams.default.driver', 'recording');
-    Config::set('streamer.propagate', ['trace_id']);
+    Config::set('modulith.events.streams.default.driver', 'recording');
+    Config::set('modulith.events.propagate', ['trace_id']);
     $transport = $this->app->make(RecordingTransport::class);
 
     Context::add(['trace_id' => 'abc', 'secret' => 'kept-local']);
@@ -86,7 +86,7 @@ it('carries only the configured context keys in the headers', function () {
 });
 
 it('restores the propagated context around the handler, then the caller one', function () {
-    Config::set('streamer.propagate', ['trace_id']);
+    Config::set('modulith.events.propagate', ['trace_id']);
     Context::add('trace_id', 'abc');
 
     $this->app->make(Dispatcher::class)->dispatch(
@@ -122,13 +122,13 @@ it('round-trips an envelope through the wire format', function () {
 });
 
 it('lets a consumer plug its own transport without touching the kernel', function () {
-    Config::set('streamer.streams.default.driver', 'recording');
+    Config::set('modulith.events.streams.default.driver', 'recording');
 
     expect($this->app->make(Transport::class))->toBeInstanceOf(RecordingTransport::class);
 });
 
 it('fails loudly on a transport nobody registered', function () {
-    Config::set('streamer.streams.default.driver', 'kafka');
+    Config::set('modulith.events.streams.default.driver', 'kafka');
 
     $this->app->make(Bus::class)->emit(new UserRegistered(5, 'lamp'));
 })->throws(ConfigurationException::class, 'Stream driver [kafka] of stream [default] is not supported');

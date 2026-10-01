@@ -2,12 +2,17 @@
 
 Laravel Modulith splits a Laravel application into modules. Each module has its own database and
 talks to the other modules only through events and RPC calls. You can run all the modules in one
-process, or move some of them to their own process by setting `WITH_MODULES`. The code doesn't
+process, or move some of them to their own process by setting `MODULITH_RUNS`. The code doesn't
 change.
 
 ```bash
-composer require mbiakova/laravel-modulith
+composer require mk-josias/laravel-modulith
+php artisan modulith:install                      # config/modulith.php, apps/, foundation/FoundationServiceProvider.php
+php artisan modulith:make-module iam --database   # apps/Iam and foundation/Iam, declared in config/modulith.php
 ```
+
+To start a new application with two example modules instead:
+`composer create-project mk-josias/laravel-modulith-skeleton my-app`.
 
 Requires PHP 8.4+ and Laravel 12 or 13. The package has no other runtime dependency.
 
@@ -34,11 +39,11 @@ the environment, and you can change it later:
 
 ```dotenv
 # at first, every module in one process
-WITH_MODULES=*
+MODULITH_RUNS=*
 
 # later, the busy module runs alone and the others stay together
-WITH_MODULES=transactions        # process A
-WITH_MODULES=iam,analytics       # process B
+MODULITH_RUNS=transactions        # process A
+MODULITH_RUNS=iam,analytics       # process B
 ```
 
 Because a module already owns its data and only talks through events and contracts, moving it to
@@ -53,7 +58,7 @@ behave the same whether two modules share a process or not.
 │ apps/Iam              apps/Analytics            apps/Transactions    │
 │  own database          own database              own database        │
 └──────────────────────────────────────────────────────────────────────┘
-          │ WITH_MODULES picks which modules each process boots
+          │ MODULITH_RUNS picks which modules each process boots
           ▼
 ┌─────────────── process A ───────────────┐   ┌──── process B ────┐
 │ iam · analytics                         │   │ transactions      │
@@ -76,8 +81,8 @@ Shadows, the read-only copies described below, are built on events.
 
 When the application boots, the package:
 
-1. finds the modules (each directory of `apps/` that contains a `modulith.php` file) and
-   autoloads them under `Apps\{Module}\`;
+1. reads the modules declared in `config/modulith.php`, and autoloads the ones this process runs
+   under `Apps\{Module}\`;
 2. registers the service provider of every module this process runs. The provider merges the
    module's config files, loads its routes, translations and commands, and binds the contracts
    the module answers itself;
@@ -106,7 +111,6 @@ part of the package. A module without a repository breaks nothing, so repositori
 
 | Contract | Default | Replace it with |
 |---|---|---|
-| `Contracts\Modules\Source`, the module list | `ManifestSource` | `modulith.source` |
 | `Contracts\Stream\Transport`, the event stream | `redis`, `queue`, `array`, `null` | `TransportManager::extend()` |
 | `Contracts\Rpc\RpcTransport`, calls between modules | `HttpRpcTransport` | `RpcTransportManager::extend()` |
 
@@ -119,7 +123,7 @@ The package defines the envelope format, which is why transports can be swapped.
 | Goal | organise code in modules | module boundaries and events | organise code in modules and deploy them separately |
 | Data | one shared database | one datasource | one database per module |
 | Between modules | direct calls | events and outbox | event stream with an ordered outbox, and RPC |
-| Moving a module to its own service | rewrite | new application | `WITH_MODULES` |
+| Moving a module to its own service | rewrite | new application | `MODULITH_RUNS` |
 
 ### Out of scope
 
@@ -134,15 +138,16 @@ The package defines the envelope format, which is why transports can be swapped.
 `app/` is still your Laravel application. Each module lives in `apps/`.
 
 ```
+config/modulith.php                   declares the modules: 'modules' => ['iam' => [], …]
+
 apps/Iam/
-├── modulith.php                      marks the directory as a module
 ├── app/                              Apps\Iam\, laid out like a Laravel app
 │   ├── Providers/IamServiceProvider.php
 │   ├── Models/User.php
 │   └── Events/UserRegistered.php
 ├── config/
 │   ├── database.php                  its connections; if the file exists, the module has a database
-│   └── streamer.php                  the events it listens to
+│   └── modulith.php                  the events it listens to
 ├── database/migrations/
 └── routes/api.php                    served under /iam/api/…
 
@@ -156,8 +161,11 @@ foundation/
 ```
 
 ```php
-// apps/Iam/modulith.php
-return [];
+// config/modulith.php
+'modules' => [
+    'iam'       => [],
+    'analytics' => [],
+],
 
 // apps/Iam/app/Providers/IamServiceProvider.php
 final class IamServiceProvider extends \Modulith\Providers\ModuleServiceProvider {}
@@ -200,8 +208,8 @@ final class RecordSignup implements \Modulith\Contracts\Stream\Handler
     public function handle(string $name, array $payload): void { /* ... */ }
 }
 
-// apps/Analytics/config/streamer.php
-return ['listen' => ['iam.user.registered' => [RecordSignup::class]]];
+// apps/Analytics/config/modulith.php
+return ['events' => ['listen' => ['iam.user.registered' => [RecordSignup::class]]]];
 ```
 
 ```bash
@@ -212,14 +220,18 @@ php artisan modulith:events:consume --module=analytics
 
 ### Declaring a module
 
-A directory inside the modules directory is a module if it contains a `modulith.php` file. The
-file just returns `[]`. Everything else is derived from the directory name. You can change the
-modules directory and namespace:
+A module is a name in `modulith.modules`. Its folder is `apps/` followed by the name in
+StudlyCase, and everything else is derived from that folder. The configuration only holds what the
+folder can't tell, such as the URL of a module that runs elsewhere:
 
 ```php
-// config/modulith.php
-'modules_path'      => 'apps',   // e.g. 'modules'
-'modules_namespace' => 'Apps',   // e.g. 'Modules'
+// config/modulith.php (php artisan vendor:publish --tag=modulith-config)
+'modules' => [
+    'iam'       => ['host' => env('MODULITH_IAM_HOST')],
+    'analytics' => [],
+],
+'paths'      => ['modules' => 'apps', 'foundation' => 'foundation'],
+'namespaces' => ['modules' => 'Apps', 'foundation' => 'Foundation'],
 ```
 
 | | Module `Iam`, with the defaults |
@@ -230,26 +242,51 @@ modules directory and namespace:
 | database | yes, because `apps/Iam/config/database.php` exists |
 
 ```bash
-php artisan modulith:make-module point_of_sale [--database]   # creates apps/PointOfSale and foundation/PointOfSale
+php artisan modulith:make-module point_of_sale [--database]   # creates apps/PointOfSale and foundation/PointOfSale, and declares it
 php artisan modulith:list                                     # lists the modules, where they run, their database and host
+php artisan modulith:purge                                    # deletes the folder of the modules this process doesn't run
 php artisan modulith:doctor                                   # checks that the modules can run, see "Checking the application"
 ```
 
 ### Which modules a process runs
 
 ```dotenv
-WITH_MODULES=*                       # every module (the default)
-WITH_MODULES=transactions,analytics  # only these
+MODULITH_RUNS=*                       # every module (the default)
+MODULITH_RUNS=transactions,analytics  # only these
 ```
 
 `Modulith\Services\Modules\ModuleRegistry` gives you both lists: `all()` returns every declared
 module and `local()` the ones this process runs. `get($name)` throws on an unknown name, and
 `forClass($class)` returns the module a class belongs to, based on its namespace.
 
-Modules are discovered by scanning the directory tree. In production, `php artisan optimize` runs
-`modulith:cache`, which writes the modules, their copies and the shadow sources to
-`bootstrap/cache/modulith.php`, and the application reads that file instead. `optimize:clear` (or
-`modulith:clear`) deletes it.
+In production, `php artisan optimize` runs `modulith:cache`, which writes what the module folders
+tell (namespaces, databases, copies and shadow sources) to `bootstrap/cache/modulith.php`, and the
+application reads that file instead of the folders. `optimize:clear` (or `modulith:clear`) deletes
+it. The cache never decides which modules exist: `modulith.modules` does.
+
+### Modules this process doesn't run
+
+The package only autoloads the classes of the modules in `MODULITH_RUNS`, plus the foundation. A
+class of any other module is never loaded, even if its file is on disk: using it throws a
+`ModuleException`.
+
+```
+[Apps\Iam\Services\IamService] belongs to module [iam], which this process does not run (MODULITH_RUNS): go through its foundation contract or an event.
+```
+
+This catches, at runtime, a call that `Boundaries` would have caught in your tests. A process still
+knows that the other modules exist, because `config/modulith.php` declares them: it listens to
+their events, and calls them through the RPC services of the foundation.
+
+When you build an image for some modules only, you can delete the folders of the others:
+
+```bash
+MODULITH_RUNS=analytics php artisan modulith:purge --force
+```
+
+Run it in your Dockerfile, after copying the code and before `composer dump-autoload`. Starting an
+image with a module in `MODULITH_RUNS` whose folder was purged fails at boot, with the name of the
+module.
 
 With `MODULITH_STATUS_ROUTE=/`, the process returns the modules it runs:
 
@@ -269,18 +306,12 @@ module directory:
 | `lang/` | Loaded under the module name: `__('iam::messages.hello')`. |
 | Artisan commands | Every `Illuminate\Console\Command` in `app/` is registered (console only). |
 
-### Declaring modules another way
-
-The default `Modulith\Contracts\Modules\Source` looks for `modulith.php` files. To declare modules
-another way, set `modulith.source` to your own implementation that returns a
-`list<Modulith\Data\Module>`.
-
 ### The foundation
 
 A module never uses another module's classes, because that import would break as soon as the
 modules are deployed separately. What a module shares with the others (its RPC contracts and
 services, the shape of its copies, its event names) goes in `foundation/{Module}/`, autoloaded as
-`Foundation\{Module}\` (`modulith.foundation_path`, `modulith.foundation_namespace`). Any module can
+`Foundation\{Module}\` (`modulith.paths.foundation`, `modulith.namespaces.foundation`). Any module can
 use the foundation, and the foundation uses no module.
 
 ```
@@ -304,10 +335,11 @@ php artisan modulith:doctor
 
 | It reports | Example |
 |---|---|
+| a folder of `apps/` that `modulith.modules` doesn't declare | `[apps/Billing] is not declared in modulith.modules.` |
 | a module whose service provider class doesn't exist | `[gateway] provider Apps\Gateway\Providers\GatewayServiceProvider does not exist.` |
 | a local module with a database but no declared connection | `[iam] connection [iam_owner] is not declared.` |
-| a module running elsewhere that serves a contract, with no `rpc.hosts` entry | `[iam] runs elsewhere and serves Foundation\Iam\Contracts\IamService, but rpc.hosts has no entry for it.` |
-| RPC contracts declared while the secret is empty | `Modules serve RPC contracts but rpc.secret is empty: set MODULITH_RPC_SECRET or APP_KEY.` |
+| a module running elsewhere that serves a contract, with no host | `[iam] runs elsewhere and serves Foundation\Iam\Contracts\IamService, but modulith.modules.iam.host is not set.` |
+| RPC contracts declared while the secret is empty | `Modules serve RPC contracts but modulith.rpc.secret is empty: set MODULITH_RPC_SECRET or APP_KEY.` |
 | a module using another module's classes, or the foundation using a module | `Boundary crossed: apps/Analytics/app/Models/Report.php: Apps\Iam\Models\User` |
 
 It lists every problem and exits with a non-zero code if there is at least one.
@@ -416,10 +448,10 @@ emit(Event) ─► Envelope ─► [outbox ─► publisher] ─► transport �
 ```
 
 Events go through the stream even when both modules run in the same process, so they behave the
-same in every setup. The consuming module declares its handlers in its `config/streamer.php`:
+same in every setup. The consuming module declares its handlers in its own `config/modulith.php`:
 
 ```php
-return ['listen' => ['iam.user.registered' => [RecordSignup::class]]];
+return ['events' => ['listen' => ['iam.user.registered' => [RecordSignup::class]]]];
 ```
 
 A handler receives the event name and the raw payload.
@@ -448,8 +480,8 @@ acknowledge it and skip it, and the `queue` transport doesn't deliver it to them
 ### Context propagation
 
 ```php
-// config/streamer.php
-'propagate' => ['trace_id', 'locale'],
+// config/modulith.php
+'events' => ['propagate' => ['trace_id', 'locale']],
 ```
 
 These keys of Laravel's `Context` are copied into the envelope headers when the event is emitted,
@@ -459,27 +491,27 @@ and restored around each handler. RPC calls carry them too.
 
 | Transport | |
 |---|---|
-| `redis` | Redis Streams, the default. One stream per emitting module (`modulith:events:{module}`) and one consumer group per consuming module. Entries are handled in order: a failing entry blocks the ones after it and is retried first. |
-| `queue` | Any Laravel queue connection (`database`, `sqs`, …), if you don't use Redis. Each envelope is copied to one queue per module with a database (`modulith-events-{module}`). A failed envelope is retried after the ones behind it, so order isn't kept after a failure. |
+| `redis` | Redis Streams, the default. One Redis stream per configured stream (`modulith:events`), written by every module, and one consumer group per consuming module. Entries are handled in the order they were published, whichever module emitted them. With `'on_failure' => 'block'` (the default), a failing entry blocks the ones after it and is retried first. With `'skip'`, the ones after it go on, and the failed entry comes back after `claim_after`. |
+| `queue` | Any Laravel queue connection (`database`, `sqs`, …), if you don't use Redis. Each envelope is copied to one queue per declared module (`modulith:events-{module}`), so every module needs a consumer. A failed envelope is retried after the ones behind it, so order isn't kept after a failure. |
 | `array` | In memory, for tests. Consuming reads everything and returns. |
 | `null` | Drops everything. |
 
-A stream is an entry in `streamer.streams` with a driver and its options, like a queue
-connection. A module can declare its own streams in its `config/streamer.php`, and an event chooses
+A stream is an entry in `modulith.events.streams` with a driver and its options, like a queue
+connection. A module can declare its own streams in its `config/modulith.php`, and an event chooses
 its stream:
 
 ```php
-// apps/Transactions/config/streamer.php
-return [
+// apps/Transactions/config/modulith.php
+return ['events' => [
     'streams' => [
-        'payments' => ['driver' => 'redis', 'connection' => 'payments'],
+        'payments' => ['driver' => 'redis', 'connection' => 'payments', 'key' => 'modulith:payments'],
     ],
-];
+]];
 
 // apps/Transactions/app/Events/PaymentCaptured.php
 public function stream(): ?string
 {
-    return 'payments'; // null means streamer.default
+    return 'payments'; // null means modulith.events.stream
 }
 ```
 
@@ -495,19 +527,29 @@ app(\Modulith\Services\Stream\TransportManager::class)
 ```
 
 A transport implements `publish()`, a blocking `consume()` loop and `stop()`. If the consume
-callback returns normally, the message is acknowledged; if it throws, it isn't.
+callback returns normally, the message is acknowledged; if it throws, it isn't. That is enough to
+emit and consume. The other commands ask the transport for more, through these interfaces:
+
+| Interface | Used by | Without it |
+|---|---|---|
+| `Contracts\Stream\TrimsStreams` | `modulith:events:trim` | the command trims nothing |
+| `Contracts\Stream\TracksAcknowledgements` | `modulith:events:export --acknowledged`, and the publisher, which records the id of each entry | `--acknowledged` fails; publishing works |
+| `Contracts\Stream\RedeliversEnvelopes` | the consumption guard, turned on when delivery is at-least-once | the guard stays off unless the stream has an outbox |
+
+An adapter for Kafka, RabbitMQ or another package (on its client) implements the ones its broker
+can answer, and the commands work with it unchanged.
 
 Redis keeps every entry until every consumer group has acknowledged it. Nothing is trimmed when
 writing, so a stopped consumer or a module added later doesn't miss anything. Run the trim command
 on a schedule to delete what everyone has read:
 
 ```bash
-php artisan modulith:events:trim [--module=*] [--stream=default]
+php artisan modulith:events:trim [--stream=default]
 ```
 
 ### The outbox
 
-On a stream with `'outbox' => true` (`MODULITH_STREAMER_OUTBOX=true` for the `default` stream),
+On a stream with `'outbox' => true` (`MODULITH_STREAM_OUTBOX=true` for the `default` stream),
 `emit()` writes a row to `event_publications` in the emitting module's database, inside the
 current transaction. The data and the event are committed or rolled back together. On a stream
 without an outbox, the event is published immediately. A publisher process sends the rows to the
@@ -604,7 +646,12 @@ final class IamRpcService extends \Modulith\Services\Rpc\RpcService implements I
 {
     public function findUser(int $id): ?array
     {
-        return $this->remember("iam:user:{$id}", 3600, fn () => $this->call('users', 'find', ['id' => $id]));
+        return $this->readThrough(
+            "iam:user:{$id}",
+            self::DEFAULT_TTL,                                        // a week: iam forgets the key when the user changes
+            fn () => $this->call('users', 'find', ['id' => $id]),    // the raw answer, the one kept in the cache
+            fn (array $raw) => ['id' => $raw['id'], 'name' => $raw['name']],
+        );
     }
 }
 
@@ -626,14 +673,22 @@ the timestamp, a nonce, the path, the body and the propagated context. The `rpc`
 rejects requests that are unsigned, too old, modified or replayed (each nonce is accepted once,
 using the cache). A 404 response returns `null`.
 
-`RpcService` can cache answers: `remember($key, $ttl, $fetch)`, `rememberUntil($key, $fetch,
-$ttlOf)` when the answer contains its own lifetime (for example a token cached until it expires),
-and `forget($key)`.
+`RpcService` caches answers with a read-through:
+
+| Method | What it does |
+|---|---|
+| `readThrough($key, $ttl, $fetch, $map, $tags)` | reads the cache; on a miss, calls `$fetch` and keeps its raw answer. `$map` turns the raw answer into what you return, on every read, so a mapping changed by a deploy applies to answers cached before it. An answer `$map` can no longer read is logged, dropped and returned as `null`. |
+| `readThroughUntil($key, $fetch, $map, $ttlOf)` | the same, with a lifetime read from the mapped answer, for example a token kept until it expires. A lifetime of zero or less is returned as `null`. |
+| `forget($key, $tags)` | drops an answer. The owner calls it when it writes, which is why `DEFAULT_TTL` can be a week. |
+
+The answers live in the store `modulith.rpc.cache` names (`MODULITH_RPC_CACHE_STORE`, the default
+store when empty). Analytics keeps iam's answer and iam forgets it, so every process must use the
+same store, even when each module has its own cache for the rest.
 
 ```php
-// config/rpc.php
-'hosts'  => ['iam' => 'https://iam.internal'],
-'secret' => env('MODULITH_RPC_SECRET', env('APP_KEY')),
+// config/modulith.php
+'modules' => ['iam' => ['host' => 'https://iam.internal']],
+'rpc'     => ['secret' => env('MODULITH_RPC_SECRET', env('APP_KEY'))],
 ```
 
 The caller and the called process must use the same secret. It defaults to `APP_KEY`, which works
@@ -644,9 +699,9 @@ a 403.
 Calls use the `http` transport unless the host names another one. To add a driver:
 
 ```php
-// config/rpc.php
-'transports' => ['http' => ['driver' => 'http'], 'grpc' => ['driver' => 'grpc', 'port' => 50051]],
-'hosts'      => ['iam' => ['url' => 'grpc://iam.internal', 'transport' => 'grpc']],
+// config/modulith.php
+'modules' => ['iam' => ['host' => ['url' => 'grpc://iam.internal', 'transport' => 'grpc']]],
+'rpc'     => ['transports' => ['http' => ['driver' => 'http'], 'grpc' => ['driver' => 'grpc', 'port' => 50051]]],
 
 app(\Modulith\Services\Rpc\RpcTransportManager::class)
     ->extend('grpc', fn ($app, array $config, string $name) => new GrpcRpcTransport($config));
@@ -703,56 +758,44 @@ its `recipients`, so only those modules update their copy.
 
 ## Configuration
 
-`php artisan vendor:publish --tag=modulith-config` publishes three files. The package reads them
-only through the classes in `Modulith\Config\`: `Modules`, `Streamer`, `RedisStream`,
-`QueueStream` and `Rpc`.
-
-`config/modulith.php`
+`php artisan vendor:publish --tag=modulith-config` publishes `config/modulith.php`, the only
+configuration file. The package reads it only through the classes in `Modulith\Config\`:
+`Modules`, `Streamer`, `RedisStream`, `QueueStream` and `Rpc`.
 
 | Key | Default | |
 |---|---|---|
-| `source` | `ManifestSource::class` | provides the module list |
-| `with` | `env('WITH_MODULES', '*')` | modules this process runs |
-| `modules_path` | `apps` | directory scanned for modules |
-| `modules_namespace` | `Apps` | root namespace of the modules |
-| `foundation_path` | `foundation` | directory of what modules share with each other |
-| `foundation_namespace` | `Foundation` | its root namespace |
+| `modules` | `[]` | `'iam' => ['host' => …]`: every module, and the URL of the ones running elsewhere |
+| `runs` | `env('MODULITH_RUNS', '*')` | modules this process runs |
+| `paths.modules` | `apps` | directory of the modules |
+| `paths.foundation` | `foundation` | directory of what modules share with each other |
+| `namespaces.modules` | `Apps` | root namespace of the modules |
+| `namespaces.foundation` | `Foundation` | root namespace of the foundation |
+| `rpc.transport` | `env('MODULITH_RPC_TRANSPORT', 'http')` | transport used when a host doesn't name one |
+| `rpc.transports` | `http` | named transports, each with a `driver` and its options |
+| `rpc.secret` | `env('MODULITH_RPC_SECRET', env('APP_KEY'))` | signs every call; must be the same in every process |
+| `rpc.signature_ttl` | `30` | how long a signature stays valid, in seconds |
+| `rpc.cache` | `env('MODULITH_RPC_CACHE_STORE')` | the cache store of the RPC answers, shared by every process; `null` for the default one |
+| `events.stream` | `env('MODULITH_STREAM', 'default')` | stream used when an event's `stream()` returns `null` |
+| `events.streams` | `default`, on `redis` | named streams, each with a `driver` and its options; modules can add their own |
+| `events.listen` | `[]` | `'event.name' => [Handler::class, ...]`, filled by the modules |
+| `events.guard` | `env('MODULITH_STREAM_GUARD')` | `null` means automatic |
+| `events.propagate` | `[]` | `Context` keys copied into the envelope headers |
 | `status_route` | `env('MODULITH_STATUS_ROUTE')` | path of the status route, `null` for none |
-
-`config/streamer.php`
-
-| Key | Default | |
-|---|---|---|
-| `default` | `env('MODULITH_STREAMER_STREAM', 'default')` | stream used when an event's `stream()` returns `null` |
-| `streams` | `default`, on `redis` | named streams, each with a `driver` and its options; modules can add their own |
-| `guard` | `env('MODULITH_STREAMER_GUARD')` | `null` means automatic |
-| `listen` | `[]` | `'event.name' => [Handler::class, ...]`, filled by the modules |
-| `propagate` | `[]` | `Context` keys copied into the envelope headers |
 
 Stream options, by driver:
 
 | Driver | Option | Default | |
 |---|---|---|---|
-| any | `outbox` | `false` | write to `event_publications` in the current transaction; the `default` stream reads `MODULITH_STREAMER_OUTBOX` |
-| `redis` | `connection` | `default` | a `database.redis` connection |
-| | `prefix` | `modulith:{stream}:` | keys are `{prefix}{module}`; the `default` stream uses `modulith:events:` |
+| any | `outbox` | `false` | write to `event_publications` in the current transaction; the `default` stream reads `MODULITH_STREAM_OUTBOX` |
+| `redis` | `connection` | `default` | a `database.redis` connection; the `default` stream reads `MODULITH_STREAM_CONNECTION` |
+| | `key` | `modulith:{stream}` | the Redis stream every module writes to; the `default` stream uses `modulith:events` |
 | | `block` | `5000` | how long a read waits, in ms |
 | | `count` | `50` | entries per read |
 | | `claim_after` | `60000` | after how long a dead consumer's pending entries are taken back, in ms |
+| | `on_failure` | `block` | `block`: a failed entry is retried before any later one; `skip`: later entries go on |
 | `queue` | `connection` | `null` | a `queue.connections` entry, `null` for the default one |
-| | `prefix` | `modulith-{stream}-` | queues are `{prefix}{module}` |
+| | `key` | `modulith-{stream}` | queues are `{key}-{module}` |
 | | `sleep` | `1` | seconds to wait when the queue is empty |
-
-`config/rpc.php`
-
-| Key | Default | |
-|---|---|---|
-| `services` | `[]` | contract → `module` and `rpc` service, filled at boot from the `FoundationServiceProvider` |
-| `default` | `env('MODULITH_RPC_TRANSPORT', 'http')` | transport used when a host doesn't name one |
-| `transports` | `http` | named transports, each with a `driver` and its options |
-| `hosts` | `[]` | `'iam' => 'https://iam.internal'`, or `['url' => …, 'transport' => 'grpc']` |
-| `secret` | `env('MODULITH_RPC_SECRET', env('APP_KEY'))` | signs every call; must be the same in every process |
-| `signature_ttl` | `30` | how long a signature stays valid, in seconds |
 
 ### Source layout
 
@@ -760,13 +803,12 @@ Stream options, by driver:
 src/
 ├── Providers/          ModulithServiceProvider · ModuleServiceProvider · FoundationServiceProvider
 ├── Http/               Controllers/StatusController · Middleware/{VerifyRpcSignature, SetModuleContext}
-├── Console/Commands/   MakeModule · ListModules · Doctor · CacheModules · ClearModules · PublishEvents · RepublishEvents · ConsumeEvents
+├── Console/Commands/   Install · MakeModule · ListModules · Doctor · PurgeModules · CacheModules · ClearModules · PublishEvents · RepublishEvents · ConsumeEvents
 │                       TrimEvents · ExportEvents · ImportEvents · AnnounceShadows · WantShadows
 ├── Console/Migrations/ MigrateCommand · StatusCommand · RollbackCommand · ResetCommand · RefreshCommand
 │                       FreshCommand · RunsForEachModule
 ├── Config/             Modules · Streamer · RedisStream · QueueStream · Rpc
 ├── Contracts/
-│   ├── Modules/        Source
 │   ├── Stream/         Bus · Transport · Handler · Idempotent · RedeliversEnvelopes · TrimsStreams · TracksAcknowledgements
 │   ├── Rpc/            RpcTransport
 │   └── Shadows/        Shadowed
@@ -780,9 +822,9 @@ src/
 ├── Handlers/           SyncShadows · AnnounceShadowSource
 ├── Testing/            Boundaries · InteractsWithModules
 ├── Services/
-│   ├── Modules/        ModuleRegistry · ManifestSource · CachedSource · DiscoveryCache · ModuleContext · ModuleMigrations
+│   ├── Modules/        ModuleRegistry · DiscoveryCache · ModuleContext · ModuleMigrations
 │   ├── Stream/         Emitter · Dispatcher · EnvelopeFactory · TransportManager · Outbox/{Writer, Relay, Archive}
-│   ├── Rpc/            RpcService · RpcSignature · RpcTransportManager
+│   ├── Rpc/            RpcService · RpcServices · RpcSignature · RpcTransportManager
 │   └── Shadows/        ShadowRegistry
 └── Transports/
     ├── Stream/         RedisStreamTransport · QueueTransport · ArrayTransport · NullTransport

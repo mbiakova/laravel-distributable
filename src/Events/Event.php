@@ -28,7 +28,7 @@ abstract class Event
         return [];
     }
 
-    /** The stream of streamer.streams it travels on; null for the default one. */
+    /** The stream of modulith.events.streams it travels on; null for the default one. */
     public function stream(): ?string
     {
         return null;

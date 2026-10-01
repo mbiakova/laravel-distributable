@@ -20,21 +20,21 @@ final class ShadowRegistry
         private readonly DiscoveryCache $cache,
     ) {}
 
-    /** @return list<class-string<ShadowModel>> the concrete copies of $sourceTable kept here */
-    public function shadowsOf(string $sourceTable): array
+    /** @return list<class-string<ShadowModel>> the concrete copies of $sourceTable kept here, or by $keeper alone */
+    public function shadowsOf(string $sourceTable, ?Module $keeper = null): array
     {
         return array_values(array_filter(
-            $this->localShadows(),
+            $this->localShadows($keeper),
             static fn (string $shadow): bool => $shadow::sourceTable() === $sourceTable,
         ));
     }
 
-    /** @return list<class-string<ShadowModel>> every concrete copy the local modules keep */
-    public function localShadows(): array
+    /** @return list<class-string<ShadowModel>> every concrete copy the local modules keep, or $keeper alone */
+    public function localShadows(?Module $keeper = null): array
     {
         $shadows = [];
 
-        foreach ($this->registry->local() as $module) {
+        foreach ($keeper === null ? $this->registry->local() : [$keeper] as $module) {
             /** @var list<class-string<ShadowModel>> $kept */
             $kept = $this->cache->load()['shadows'][$module->name] ?? $this->scanShadows($module);
             $shadows = [...$shadows, ...$kept];
@@ -43,10 +43,10 @@ final class ShadowRegistry
         return $shadows;
     }
 
-    /** The local source model of $sourceTable, if this process runs its owner. */
-    public function sourceOf(string $sourceTable): ?Shadowed
+    /** The local source model of $sourceTable, if this process runs its owner (or $owner is it). */
+    public function sourceOf(string $sourceTable, ?Module $owner = null): ?Shadowed
     {
-        foreach ($this->registry->local() as $module) {
+        foreach ($owner === null ? $this->registry->local() : [$owner] as $module) {
             foreach ($this->cache->load()['sources'][$module->name] ?? $this->scanSources($module) as $class) {
                 /** @var Model&Shadowed $model */
                 $model = new $class;

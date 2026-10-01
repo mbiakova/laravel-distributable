@@ -25,7 +25,7 @@ final class TrackingTransport implements TracksAcknowledgements, Transport
         return ++$this->next.'-0';
     }
 
-    public function isAcknowledged(string $channel, string $entryId): bool
+    public function isAcknowledged(string $entryId): bool
     {
         return (int) $entryId <= $this->acknowledgedUpTo;
     }

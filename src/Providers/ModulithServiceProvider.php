@@ -29,41 +29,47 @@ use Modulith\Console\Commands\ConsumeEvents;
 use Modulith\Console\Commands\Doctor;
 use Modulith\Console\Commands\ExportEvents;
 use Modulith\Console\Commands\ImportEvents;
+use Modulith\Console\Commands\Install;
 use Modulith\Console\Commands\ListModules;
 use Modulith\Console\Commands\MakeModule;
 use Modulith\Console\Commands\PublishEvents;
+use Modulith\Console\Commands\PurgeModules;
 use Modulith\Console\Commands\RepublishEvents;
 use Modulith\Console\Commands\TrimEvents;
 use Modulith\Console\Commands\WantShadows;
 use Modulith\Console\Migrations;
-use Modulith\Contracts\Modules\Source;
 use Modulith\Contracts\Rpc\RpcTransport;
 use Modulith\Contracts\Stream\Bus;
 use Modulith\Contracts\Stream\Transport;
-use Modulith\Exceptions\ConfigurationException;
+use Modulith\Data\Module;
+use Modulith\Exceptions\ModuleException;
 use Modulith\Http\Controllers\StatusController;
 use Modulith\Http\Middleware\VerifyRpcSignature;
 use Modulith\Jobs\BatchRepository;
 use Modulith\Jobs\FailedJobProvider;
-use Modulith\Services\Modules\CachedSource;
 use Modulith\Services\Modules\DiscoveryCache;
-use Modulith\Services\Modules\ManifestSource;
 use Modulith\Services\Modules\ModuleContext;
 use Modulith\Services\Modules\ModuleRegistry;
+use Modulith\Services\Rpc\RpcServices;
 use Modulith\Services\Rpc\RpcTransportManager;
 use Modulith\Services\Stream\Emitter;
 use Modulith\Services\Stream\TransportManager;
 
 final class ModulithServiceProvider extends BaseServiceProvider
 {
+    private static bool $guardsRemoteModules = false;
+
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../../config/modulith.php', 'modulith');
-        $this->mergeConfigFrom(__DIR__.'/../../config/streamer.php', 'streamer');
-        $this->mergeConfigFrom(__DIR__.'/../../config/rpc.php', 'rpc');
+
+        // Left null, the database cache store would keep the connection of whichever module first used it.
+        $config = $this->app['config'];
+        $config->set('cache.stores.database.connection', $config->get('cache.stores.database.connection') ?? $config->get('database.default'));
 
         $this->app->singleton(TransportManager::class);
         $this->app->singleton(RpcTransportManager::class);
+        $this->app->singleton(RpcServices::class);
         $this->app->bind(RpcTransport::class, RpcTransportManager::class);
 
         $this->app->singleton(Bus::class, Emitter::class);
@@ -75,28 +81,19 @@ final class ModulithServiceProvider extends BaseServiceProvider
             static fn (Application $app): Transport => $app->make(TransportManager::class)->stream(),
         );
 
-        $this->app->singleton(ManifestSource::class, static function (Application $app): ManifestSource {
-            $config = $app->make(Modules::class);
-
-            return new ManifestSource(
-                modulesPath: $config->getModulesPath(),
-                modulesNamespace: $config->getModulesNamespace(),
-            );
-        });
-
         $this->app->singleton(DiscoveryCache::class);
 
+        // What the folder of a declared module tells is read from the cache when there is one.
         $this->app->singleton(ModuleRegistry::class, static function (Application $app): ModuleRegistry {
             $config = $app->make(Modules::class);
-            $source = $app->make(DiscoveryCache::class)->load() !== null
-                ? $app->make(CachedSource::class)
-                : $app->make($config->getSource());
+            $cached = array_column($app->make(DiscoveryCache::class)->load()['modules'] ?? [], null, 'name');
 
-            if (! $source instanceof Source) {
-                throw ConfigurationException::invalidSource($source::class, Source::class);
-            }
-
-            return new ModuleRegistry($source, $config->getLoadedModules());
+            return new ModuleRegistry(array_map(
+                static fn (string $name): Module => isset($cached[$name])
+                    ? Module::fromArray($cached[$name])
+                    : Module::fromName($name, $config->getModulesNamespace(), $config->getModulesPath()),
+                $config->getDeclaredModules(),
+            ), $config->getLoadedModules());
         });
 
         $this->app->singleton(ModuleContext::class);
@@ -167,13 +164,17 @@ final class ModulithServiceProvider extends BaseServiceProvider
         });
     }
 
-    /** Registers the service provider of every module this process boots (WITH_MODULES). */
+    /** Registers the service provider of every module this process boots (MODULITH_RUNS). */
     private function registerLocalModuleProviders(): void
     {
         $registry = $this->app->make(ModuleRegistry::class);
         $this->autoloadModules($registry);
 
         foreach ($registry->local() as $module) {
+            if (! is_dir($module->path())) {
+                throw ModuleException::missingFolder($module->name, $module->path());
+            }
+
             // class_exists keeps the app bootable while a module's provider does not exist yet.
             if (class_exists($module->provider)) {
                 $this->app->register($module->provider);
@@ -188,7 +189,11 @@ final class ModulithServiceProvider extends BaseServiceProvider
         }
     }
 
-    /** Maps each module's namespace to its app/ directory, and the foundation's to its own, so composer.json needs no entry. */
+    /**
+     * Autoloads the foundation and the modules this process runs, with no composer.json entry. A
+     * class of a module running elsewhere is never loaded: using one throws instead of reading
+     * code this process must not depend on — whether that code is still on disk or was purged.
+     */
     private function autoloadModules(ModuleRegistry $registry): void
     {
         $loader = new ClassLoader;
@@ -196,19 +201,35 @@ final class ModulithServiceProvider extends BaseServiceProvider
 
         $loader->addPsr4($config->getFoundationNamespace().'\\', $config->getFoundationPath());
 
-        foreach ($registry->all() as $module) {
+        foreach ($registry->local() as $module) {
             $loader->addPsr4($module->namespace.'\\', $module->classPath());
         }
 
         $loader->register();
+
+        if (! self::$guardsRemoteModules) {
+            self::$guardsRemoteModules = true;
+
+            // Prepended, so it answers before any loader that could still find the file; the registry is read per call.
+            spl_autoload_register(static function (string $class): void {
+                if (! app()->resolved(ModuleRegistry::class)) {
+                    return;
+                }
+
+                $registry = app(ModuleRegistry::class);
+                $module = $registry->forClass($class);
+
+                if ($module !== null && ! $registry->isLocal($module->name)) {
+                    throw ModuleException::notLocal($class, $module->name);
+                }
+            }, prepend: true);
+        }
     }
 
     public function boot(): void
     {
         $this->publishes([
             __DIR__.'/../../config/modulith.php' => config_path('modulith.php'),
-            __DIR__.'/../../config/streamer.php' => config_path('streamer.php'),
-            __DIR__.'/../../config/rpc.php' => config_path('rpc.php'),
         ], 'modulith-config');
 
         // Every module's routes/rpc.php lands in this group: nothing unsigned reaches it.
@@ -225,7 +246,7 @@ final class ModulithServiceProvider extends BaseServiceProvider
 
         if ($this->app->runningInConsole()) {
             $this->commands([
-                MakeModule::class, ListModules::class, Doctor::class,
+                Install::class, MakeModule::class, ListModules::class, Doctor::class, PurgeModules::class,
                 CacheModules::class, ClearModules::class, PublishEvents::class, RepublishEvents::class, ConsumeEvents::class,
                 TrimEvents::class, ExportEvents::class, ImportEvents::class, AnnounceShadows::class, WantShadows::class,
             ]);

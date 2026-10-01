@@ -18,7 +18,7 @@ use Modulith\Transports\Stream\QueueTransport;
 use Modulith\Transports\Stream\RedisStreamTransport;
 
 /**
- * Resolves a named stream of streamer.streams to its transport, like QueueManager::connection(),
+ * Resolves a named stream of modulith.events.streams to its transport, like QueueManager::connection(),
  * and stays open: extend('kafka', fn ($app, array $options, string $stream) => …) registers any
  * driver. The package closes nothing; it only ships defaults.
  */

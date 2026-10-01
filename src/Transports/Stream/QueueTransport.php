@@ -16,8 +16,8 @@ use Throwable;
 /**
  * Events over a Laravel queue connection — database, sqs, beanstalkd — for a stack without Redis.
  *
- * A queue hands each job to one reader, so publishing fans out: one copy per module with a
- * database, on its own queue `{prefix}{module}`. A failed envelope is released and comes back
+ * A queue hands each job to one reader, so publishing fans out: one copy per declared module,
+ * on its own queue `{key}-{module}`. A failed envelope is released and comes back
  * after the ones queued behind it: this transport does not keep the order across a failure.
  */
 final class QueueTransport implements RedeliversEnvelopes, Transport
@@ -35,7 +35,7 @@ final class QueueTransport implements RedeliversEnvelopes, Transport
     public function publish(Envelope $envelope): void
     {
         foreach ($this->registry->all() as $module) {
-            if ($module->hasDatabase && $envelope->isFor($module->name)) {
+            if ($envelope->isFor($module->name)) {
                 $this->connection()->pushRaw($envelope->toJson(), $this->queue($module->name));
             }
         }
@@ -83,7 +83,7 @@ final class QueueTransport implements RedeliversEnvelopes, Transport
 
     private function queue(string $module): string
     {
-        return $this->config->getPrefix().$module;
+        return $this->config->getKey().'-'.$module;
     }
 
     private function connection(): Connection

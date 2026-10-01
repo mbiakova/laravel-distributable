@@ -11,7 +11,11 @@ final class IamRpcService extends RpcService implements IamService
 {
     public function findUser(int $id): ?array
     {
-        /** @var array{id: int, name: string}|null */
-        return $this->remember("iam:user:{$id}", 3600, fn (): mixed => $this->call('users', 'find', ['id' => $id]));
+        return $this->readThrough(
+            "iam:user:{$id}",
+            self::DEFAULT_TTL,
+            fn (): mixed => $this->call('users', 'find', ['id' => $id]),
+            fn (array $raw): array => ['id' => (int) $raw['id'], 'name' => (string) $raw['name']],
+        );
     }
 }

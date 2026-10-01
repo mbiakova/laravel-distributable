@@ -7,6 +7,6 @@ namespace Modulith\Contracts\Stream;
 /** A transport that keeps envelopes after delivery, and drops only those every consumer acknowledged. */
 interface TrimsStreams
 {
-    /** @return int how many entries were dropped from this emitter's stream */
-    public function trim(string $channel): int;
+    /** @return int how many entries were dropped from this stream */
+    public function trim(): int;
 }
