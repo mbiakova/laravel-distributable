@@ -6,9 +6,13 @@ namespace Modulith\Testing;
 
 use Closure;
 use Illuminate\Foundation\Testing\WithConsoleEvents;
+use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Str;
+use Modulith\Data\Envelope;
 use Modulith\Exceptions\ModuleException;
 use Modulith\Services\Modules\ModuleContext;
 use Modulith\Services\Modules\ModuleRegistry;
+use Modulith\Services\Stream\Dispatcher;
 use PHPUnit\Framework\Assert;
 use ReflectionFunction;
 
@@ -43,6 +47,26 @@ trait InteractsWithModules
         $module = $this->app->make(ModuleRegistry::class)->forClass($class) ?? throw ModuleException::outsideModule($class);
 
         return $this->app->make(ModuleContext::class)->within($module, $callback);
+    }
+
+    /**
+     * Hands a module an event as the emitting module would have announced it, so the module is tested without its emitter running.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    protected function receive(string $module, string $name, array $payload = [], int $version = 1): void
+    {
+        $envelope = new Envelope(
+            id: (string) Str::uuid7(),
+            emitter: Str::before($name, '.'),
+            name: $name,
+            payload: $payload,
+            headers: [],
+            emittedAt: Date::now()->toImmutable(),
+            version: $version,
+        );
+
+        $this->app->make(Dispatcher::class)->dispatch($envelope, $this->app->make(ModuleRegistry::class)->get($module));
     }
 
     /** Event::assertListening() for a listener a module declares in $listen, which Laravel only sees as a closure. */

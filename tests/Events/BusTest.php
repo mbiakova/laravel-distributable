@@ -43,6 +43,15 @@ it('delivers an emitted event to the listening handlers once the stream is consu
         ->toBe([['iam.user.registered', ['id' => 5, 'name' => 'lamp']]]);
 });
 
+it('hands a module an event in a test, without the emitter or the stream', function () {
+    $this->receive('iam', 'iam.user.registered', ['id' => 7, 'name' => 'desk']);
+
+    $recorder = $this->app->make(Recorder::class);
+
+    expect($recorder->records)->toBe([['iam.user.registered', ['id' => 7, 'name' => 'desk']]])
+        ->and($recorder->connections)->toBe(['iam']);
+});
+
 it('ignores an event nobody listens to', function () {
     $this->app->make(Bus::class)->emit(new UserIgnored(5));
     $this->artisan('modulith:events:consume --module=iam')->assertSuccessful();

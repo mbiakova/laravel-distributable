@@ -94,6 +94,13 @@ $user = $this->inModule('iam', fn () => User::query()->create(['name' => 'ada'])
 The trait also turns on Laravel's console events in tests, so `$this->artisan('iam:sync')` runs
 the command in its module's context, as the real console does.
 
+To test a module without the module that emits its events, hand it the event directly. Its handlers
+run in its context, with no stream and no consumer:
+
+```php
+$this->receive('analytics', 'iam.user.registered', ['id' => 42]);   // emitter: iam, read from the name
+```
+
 ## Migrations
 
 The package extends Laravel's migrate commands so they run once per database. This also applies
