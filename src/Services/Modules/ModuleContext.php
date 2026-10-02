@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modulith\Services\Modules;
 
 use Closure;
+use Illuminate\Container\Container;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Support\Facades\Context;
 use Modulith\Data\Module;
@@ -19,16 +20,16 @@ final class ModuleContext
 
     private ?string $applicationDefault = null;
 
-    public function __construct(
-        private readonly Repository $config,
-        private readonly ModuleRegistry $registry,
-    ) {}
+    public function __construct(private readonly ModuleRegistry $registry) {}
 
     public function switchTo(?Module $module): void
     {
-        $this->applicationDefault ??= (string) $this->config->get('database.default');
+        // The running application, not the one this singleton was built in: Octane serves each
+        // request from its own copy, with its own config.
+        $config = Container::getInstance()->make(Repository::class);
+        $this->applicationDefault ??= (string) $config->get('database.default');
 
-        $this->config->set('database.default', $module !== null && $module->hasDatabase
+        $config->set('database.default', $module !== null && $module->hasDatabase
             ? $module->connection()
             : $this->applicationDefault);
 
@@ -40,6 +41,25 @@ final class ModuleContext
     public function switchToModuleOf(string $class): void
     {
         $this->switchTo($this->registry->forClass($class));
+    }
+
+    /**
+     * Wraps $task so it runs in the current module wherever it runs later: after the response, in
+     * another worker, in a child process. Only the module's name is captured, so the task stays
+     * serializable.
+     *
+     * @param  Closure(): mixed  $task
+     * @return Closure(): mixed
+     */
+    public function bind(Closure $task): Closure
+    {
+        $module = $this->current()?->name;
+
+        return static function () use ($module, $task): mixed {
+            $context = Container::getInstance()->make(self::class);
+
+            return $context->within($module === null ? null : $context->registry->find($module), $task);
+        };
     }
 
     /**

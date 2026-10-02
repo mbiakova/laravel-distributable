@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modulith\Services\Modules;
 
+use Illuminate\Container\Container;
 use Modulith\Config\Modules;
 use Modulith\Data\Module;
 use Modulith\Services\Shadows\ShadowRegistry;
@@ -23,7 +24,7 @@ final readonly class ModuleMigrations
     /** @return list<string> the application's migrations, plus those of the modules that have no database of their own */
     public function forApplication(): array
     {
-        $paths = [database_path('migrations')];
+        $paths = $this->applicationPaths();
 
         foreach ($this->registry->local() as $module) {
             if (! $module->hasDatabase && is_dir($module->path().'/database/migrations')) {
@@ -37,13 +38,26 @@ final readonly class ModuleMigrations
     /** @return list<string> */
     public function forModule(Module $module): array
     {
-        $paths = [dirname(__DIR__, 3).'/database/migrations', database_path('migrations')];
+        $paths = [dirname(__DIR__, 3).'/database/migrations', ...$this->applicationPaths()];
 
         if (is_dir($module->path().'/database/migrations')) {
             $paths[] = $module->path().'/database/migrations';
         }
 
         return [...$paths, ...$this->shadowMigrations($module)];
+    }
+
+    /**
+     * Laravel skips the loadMigrationsFrom() paths once a --path is given, and every run here gives one.
+     *
+     * @return list<string>
+     */
+    private function applicationPaths(): array
+    {
+        /** @var list<string> $packages */
+        $packages = Container::getInstance()->make('migrator')->paths();
+
+        return array_values(array_unique([database_path('migrations'), ...$packages]));
     }
 
     /**

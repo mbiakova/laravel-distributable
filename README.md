@@ -75,7 +75,7 @@ Modules communicate in two ways:
 | Mode | Used for | Same process | Different processes |
 |---|---|---|---|
 | Event stream (asynchronous) | announcing that something happened | through the stream | through the stream |
-| RPC (synchronous) | reading data another module owns | the module's own class | a signed HTTP call |
+| RPC (synchronous) | reading data another module owns | the module's own class, in its context | a signed HTTP call |
 
 Shadows, the read-only copies described below, are built on events.
 
@@ -84,10 +84,11 @@ When the application boots, the package:
 1. reads the modules declared in `config/modulith.php`, and autoloads the ones this process runs
    under `Apps\{Module}\`;
 2. registers the service provider of every module this process runs. The provider merges the
-   module's config files, loads its routes, translations and commands, and binds the contracts
-   the module answers itself;
-3. registers the foundation's service provider, which binds every other RPC contract to the
-   `RpcService` that calls its module over the network.
+   module's config files, loads its routes, translations and commands, and records the
+   implementation of each contract the module answers;
+3. registers the foundation's service provider, which binds every RPC contract to its
+   `RpcService`. The `RpcService` reaches the module in this process when it runs here, over the
+   network otherwise.
 
 A module that runs in another process has no config, routes or handlers here. Only its RPC
 contracts are bound.
@@ -113,8 +114,53 @@ part of the package. A module without a repository breaks nothing, so repositori
 |---|---|---|
 | `Contracts\Stream\Transport`, the event stream | `redis`, `queue`, `array`, `null` | `TransportManager::extend()` |
 | `Contracts\Rpc\RpcTransport`, calls between modules | `HttpRpcTransport` | `RpcTransportManager::extend()` |
+| `Contracts\Stream\Handler`, a module's reaction to an event | none | a class listed under `events.listen` |
+| `Contracts\Stream\Versioned`, the versions of an event's payload | none: every event is version 1 | a payload class in the owner's foundation, mapped in `FoundationServiceProvider::$payloads` |
+| `Services\Rpc\RpcService`, a module's client in the other processes | none | a subclass in `foundation/{Module}/Services`, mapped in `FoundationServiceProvider::$rpc` |
+| `Models\ShadowModel`, a read-only copy | none | an abstract subclass in the owner's foundation, extended in each keeper |
 
 The package defines the envelope format, which is why transports can be swapped.
+
+### Working with other packages
+
+The package changes a few things in Laravel. A third-party package keeps working unless it relies
+on one of them:
+
+| What the package changes | Where | What it means for another package |
+|---|---|---|
+| `database.default` follows the module the code runs in | `ModuleContext` | A package writing through the default connection (media, activity log, permissions) writes into the current module's database. Its migrations run in every module database, so its tables are there. A package that must keep one global store (Telescope, Pulse) sets its own `connection` key to the application's connection. |
+| `migrate`, `migrate:status`, `migrate:rollback`, `migrate:reset`, `migrate:refresh`, `migrate:fresh` | `ModulithServiceProvider::registerModuleMigrations()` | They run once per database, including the migrations packages load with `loadMigrationsFrom()` and the ones you publish to `database/migrations`. Another package that also replaces these commands conflicts: the last one registered wins. |
+| `queue.failer` and the job batch repository, with the `database` drivers only | `registerQueueDatabases()` | Failed jobs and batches go to the database of the module owning the job. Other drivers (Horizon, `file`, DynamoDB) are left alone. |
+| The database connection of the `database` cache, queue and session drivers | `register()` | It is pinned to the application's connection when the config leaves it empty, so it never follows a module. |
+| `DeferredCallbackCollection`, the Concurrency `process` driver, Octane's `DispatchesTasks` | `carryTheModuleIntoDeferredWork()` | Work started in a module keeps its module. A package rebinding one of them removes that, for its own work. |
+| Module providers register on `booting`, after every package provider | `registerLocalModuleProviders()` | A module can override what a package binds. |
+| `Factory::guessFactoryNamesUsing()` and `guessModelNamesUsing()` | `Support\ModuleFactories::register()` | A module model finds its factory in the module; any other class keeps Laravel's rule. A package or an application that sets its own resolver replaces this one, and can delegate to `ModuleFactories`. |
+| Every Artisan command gets a `--module` option, unless it already has one | `Console\ModuleOption` | A package's command can be run in a module's context. During a `make:*` command with `--module`, the application path, database path, config path and namespace are the module's, then restored (`Console\ModuleGenerators`). Without `--module`, nothing changes. |
+| `db:seed` is replaced | `Console\ModuleSeedCommand` | In a module's context it runs the module's seeders; outside one it is Laravel's command, unchanged. |
+| A module's `$listen` wraps each listener in the module's context | `ModuleServiceProvider::registerModuleListeners()` | A module can listen to a package's events (`Login`, a media event) and still write to its own database. A listener registered another way (`Event::listen()` in `boot()`, discovery, a subscriber) runs in the context of whoever dispatched the event. |
+| A class of a module this process doesn't run throws `ModuleException` from the autoloader | `autoloadModules()` | `class_exists()` on such a class throws instead of returning `false`. A package probing classes (discovery, morph maps) must only meet classes of the modules this process runs. |
+
+Publishing a package's migrations with `vendor:publish` puts them in `database/migrations`: they then run in
+the application's database and in every module database, like your own root migrations. Move a
+published migration to a module's `database/migrations` when only that module uses the package.
+
+A package that keeps one store for the whole application belongs to one module. Laravel Sanctum is
+the usual case: `PersonalAccessToken::findToken()` reads the default connection, so a token issued
+in `iam` is not in `analytics`' database, and its `tokenable` is iam's own model, a class the other
+processes don't load. Install it in `iam` only, and let the other modules validate tokens through
+iam's contract:
+
+```php
+// apps/Iam/app/Services/IamService.php: the User model uses HasApiTokens
+public function findUserByToken(string $token): ?array
+{
+    return $this->present(PersonalAccessToken::findToken($token)?->tokenable);
+}
+```
+
+Move Sanctum's published migration to `apps/Iam/database/migrations`, so `personal_access_tokens`
+exists in iam's database only. The same holds for a package that loads its data once per process
+under one cache key, such as spatie/laravel-permission: keep it in one module.
 
 ### Compared to other packages
 
@@ -237,16 +283,111 @@ folder can't tell, such as the URL of a module that runs elsewhere:
 | | Module `Iam`, with the defaults |
 |---|---|
 | name | `iam`, the directory name in snake_case (`^[a-z][a-z0-9_]*$`) |
-| namespace | `Apps\Iam`, autoloaded from `apps/Iam/app`, no `composer.json` entry needed |
+| namespace | `Apps\Iam`, autoloaded from `apps/Iam/app` by the package: the application needs no `composer.json` entry |
 | provider | `Apps\Iam\Providers\IamServiceProvider` |
 | database | yes, because `apps/Iam/config/database.php` exists |
 
 ```bash
 php artisan modulith:make-module point_of_sale [--database]   # creates apps/PointOfSale and foundation/PointOfSale, and declares it
+php artisan modulith:delete-module point_of_sale [--force]    # deletes its folders, its declaration and its composer.json entries; its database is left as it is
 php artisan modulith:list                                     # lists the modules, where they run, their database and host
 php artisan modulith:purge                                    # deletes the folder of the modules this process doesn't run
 php artisan modulith:doctor                                   # checks that the modules can run, see "Checking the application"
 ```
+
+`modulith:make-module` also adds the module and the foundation to the `autoload.psr-4` of your
+`composer.json`, and the module's tests to `autoload-dev`. The application doesn't read those entries: they are for the tools that read
+`composer.json` without booting Laravel, such as your IDE. They follow `paths.modules` and
+`namespaces.modules`; if you change these later, `modulith:doctor` reports the entries gone stale.
+A module outside the project gets none. `modulith:purge` can delete a module the entries name:
+Composer accepts an entry whose folder is gone.
+
+### Generating code in a module
+
+Laravel's own `make:*` commands take `--module`. They then write in the module, under its namespace,
+exactly what they write in `app/` without the option:
+
+```bash
+php artisan make:model Invoice -mf --module=billing        # apps/Billing/app/Models/Invoice.php, its migration and its factory
+php artisan make:controller InvoiceController --module=billing
+php artisan make:migration add_paid_at_to_invoices --module=billing
+```
+
+| Command | Where it writes |
+|---|---|
+| `make:model`, `controller`, `request`, `resource`, `job`, `event`, `listener`, `policy`, `rule`, `command`, `mail`, `notification`, `enum`, `class`… and the generators other packages add (`make:data`) | `{module}/app/…`, under the module's namespace |
+| `make:migration`, and `-m` on `make:model` | `{module}/database/migrations` |
+| `make:factory`, `make:seeder` | `{module}/database/factories` and `database/seeders`, under `{Namespace}\Database\Factories` and `\Seeders` |
+| `make:config` | `{module}/config` |
+| `make:view`, `make:component`, and `--markdown` on `make:mail` and `make:notification` | `{module}/resources/views`; the class that renders the view names it with the module: `view('billing::components.alert')` |
+| `make:test`, and `--test` on the other generators | `{module}/tests/Feature` or `tests/Unit`, under `{Namespace}\Tests` |
+| `make:provider` | no `--module`: a module has one provider, and the package registers it |
+
+A module's tests extend your `Tests\TestCase`. PHPUnit runs them once `phpunit.xml` lists them:
+
+```xml
+<testsuite name="Modules">
+    <directory>apps/*/tests</directory>
+</testsuite>
+```
+
+Keep in a module the tests that only need that module, and in `tests/` the ones that cross modules:
+`Boundaries` reads a module's tests like the rest of its code.
+
+A model's factory is found without any code: `Invoice::factory()` resolves
+`Apps\Billing\Database\Factories\InvoiceFactory`, and that factory resolves its model. Laravel's
+`#[UseFactory]` on a model still wins, and so does a resolver of your own; yours can fall back on
+`Modulith\Support\ModuleFactories::factoryName()` and `modelName()`.
+
+### Running a command in a module
+
+`--module` is on every Artisan command, and always names one module:
+
+| Command | What `--module=billing` does |
+|---|---|
+| `make:*` | generates in the module (above) |
+| `migrate`, `migrate:fresh`… | migrates that module's database only; it can be repeated |
+| `db:seed` | runs `Apps\Billing\Database\Seeders\DatabaseSeeder`; `--class=InvoiceSeeder` names a seeder of the module |
+| any other command, yours or a package's | runs in the module's context, on its database |
+
+```bash
+php artisan tinker --module=billing                                 # Invoice::count() reads billing's database
+php artisan model:show 'Apps\Billing\Models\Invoice' --module=billing
+php artisan db:seed --module=billing
+```
+
+Without the option, a command that isn't a module's own runs in no module: `model:show` on a
+module's model then looks for its table in the application's database.
+
+`migrate --seed` and `migrate:fresh --seed` seed each database with its own seeders: the
+application's `Database\Seeders\DatabaseSeeder` once, then each module's `DatabaseSeeder` in that
+module's run. A module without one is skipped.
+
+### Conventions
+
+Only the four roots are configuration. Everything inside them is a convention: the package reads
+it from the folder and the namespace, and no option changes it.
+
+| | Configurable | Fixed by convention |
+|---|---|---|
+| Where the modules live | `paths.modules` (`apps`), `namespaces.modules` (`Apps`) | a module is `{paths.modules}/{Name}`, its name is `{Name}` in snake_case |
+| Where the foundation lives | `paths.foundation` (`foundation`), `namespaces.foundation` (`Foundation`) | what module `iam` shares is `{paths.foundation}/Iam`, under `Foundation\Iam\` |
+| A module's code | | `app/`, under `{namespaces.modules}\{Name}\` |
+| A module's provider | | `app/Providers/{Name}ServiceProvider.php` |
+| A module's database | | it has one exactly when a connection named `{name}` exists, declared in the module's `config/database.php` or the root one, next to `{name}_owner` |
+| A module's config, routes, translations, migrations | | `config/*.php`, `routes/{surface}.php` (served under `{name}/{surface}`), `lang/`, `database/migrations/` |
+| A module's commands | | every `Illuminate\Console\Command` under `app/` |
+| A module's factories and seeders | | `database/factories/` under `{namespaces.modules}\{Name}\Database\Factories\`, `database/seeders/` under `…\Database\Seeders\` |
+| A module's views | | `resources/views/`, under the view namespace `{name}::` |
+| A module's tests | | `tests/`, under `{namespaces.modules}\{Name}\Tests\` |
+| An RPC service | | under `Foundation\{Name}\`: the segment after the root names the module it calls |
+| The migration of a copy | | `{paths.foundation}/{Owner}/database/shadows/` |
+| The foundation's provider | | `{namespaces.foundation}\FoundationServiceProvider` |
+
+They are fixed on purpose. Because the folder says everything, a module is found without being
+registered, `modulith:purge` can delete a whole folder, `Boundaries` knows which module owns a file,
+and an RPC service knows which module it calls. A setting for each would make those guarantees
+depend on configuration that every process must get right.
 
 ### Which modules a process runs
 
@@ -301,10 +442,38 @@ module directory:
 
 | Source | What happens |
 |---|---|
-| `config/*.php` | Merged into the root config file with the same name. Nested keys are merged; list items are added once. |
+| `config/*.php` | Merged into the root config file with the same name (see below). Once `config:cache` has run, the cache already holds the merge and the files are not read again. |
 | `routes/{name}.php` | Loaded under the `{module}/{name}` prefix, in the `{name}` middleware group if the application defines one. |
 | `lang/` | Loaded under the module name: `__('iam::messages.hello')`. |
+| `resources/views/` | Loaded under the module name: `view('iam::welcome')`. Anonymous components of `resources/views/components` and class components of `app/View/Components` are `<x-iam::alert />`. |
 | Artisan commands | Every `Illuminate\Console\Command` in `app/` is registered (console only). |
+| `$listen` on the provider | The Laravel events the module listens to, written as in `EventServiceProvider::$listen`. Each listener runs in the module, whichever module dispatched the event; a queued one keeps working as Laravel queues it, and an after-commit one runs once the transaction commits, still in the module. |
+
+How the config merge works, and what it can't do:
+
+| Case | Result |
+|---|---|
+| a list (`['a', 'b']`) | gains the items it lacks; a module can't remove or replace an item, so set the whole list in the root config |
+| any other array, integer keys included (`[404 => …]`) | merged key by key |
+| a scalar two local modules set differently | the module registered last wins in one process, while each keeps its own once they run apart: `modulith:doctor` reports it |
+| when it runs | as the module's provider registers, after every package provider: a package reading its config in its own `register()` doesn't see the module's values |
+| its scope | the whole process: a module overriding a package's config changes it for every module running there |
+
+A module's Laravel listeners go in `$listen`:
+
+```php
+final class IamServiceProvider extends ModuleServiceProvider
+{
+    protected array $listen = [
+        \Illuminate\Auth\Events\Login::class => [\Apps\Iam\Listeners\RecordLogin::class],
+    ];
+}
+```
+
+Laravel's own event discovery doesn't see a module's `app/Listeners`: it names
+`apps/Iam/app/Listeners/X.php` `Apps\Iam\app\Listeners\X`. Declare the listeners in `$listen`.
+In a test, `Event::assertListening()` only sees a closure for them: use
+`$this->assertListeningInModule(Login::class, RecordLogin::class)` from `InteractsWithModules`.
 
 ### The foundation
 
@@ -340,12 +509,15 @@ php artisan modulith:doctor
 | a local module with a database but no declared connection | `[iam] connection [iam_owner] is not declared.` |
 | a module running elsewhere that serves a contract, with no host | `[iam] runs elsewhere and serves Foundation\Iam\Contracts\IamService, but modulith.modules.iam.host is not set.` |
 | RPC contracts declared while the secret is empty | `Modules serve RPC contracts but modulith.rpc.secret is empty: set MODULITH_RPC_SECRET or APP_KEY.` |
-| a module using another module's classes, or the foundation using a module | `Boundary crossed: apps/Analytics/app/Models/Report.php: Apps\Iam\Models\User` |
+| a module using another module's classes, or the foundation or the application (`app/`, `routes/`, `config/`) using a module | `Boundary crossed: apps/Analytics/app/Models/Report.php: Apps\Iam\Models\User` |
+| a module naming another module's connection, or a table that module's migrations create | `Boundary crossed: apps/Analytics/app/Models/Report.php: 'iam_users'` |
+| two local modules setting one config key to different values | `Modules [analytics, iam] set config [iam.flag] to different values: in one process, the module registered last wins.` |
 
 It lists every problem and exits with a non-zero code if there is at least one.
 
 `Modulith\Testing\Boundaries` is the architecture check on its own, for your test suite. It
-doesn't depend on the configuration: it reads the PHP files of every module and of the foundation.
+doesn't depend on the configuration: it reads the PHP files of every module, of the foundation and
+of the application's `app/`, `routes/` and `config/`.
 
 ```php
 // tests/Architecture/BoundariesTest.php
@@ -358,12 +530,21 @@ it('keeps the modules apart', function () {
 
 ### Connections
 
-A module with a database declares two connections in its `config/database.php`:
+A module with a database has two connections, named after it. There is no mapping to fill in: the
+name is the link, so module `iam` uses the connections `iam` and `iam_owner`, and no other.
 
 | Connection | Role |
 |---|---|
 | `{module}` | Used at runtime to read and write rows. |
 | `{module}_owner` | Owns the tables and can create and alter them. Only the `migrate` commands use it. |
+
+Declare them where you prefer; the module has a database as soon as the connection `{module}` exists:
+
+| Where | Result |
+|---|---|
+| the module's `config/database.php` | merged into `database.connections`; the module carries its own setup |
+| the root `config/database.php`, next to `sqlite` and `pgsql` | the same, with every connection in one file |
+| nowhere | the module has no database of its own: it uses the application's, and its migrations run there |
 
 The connections can point to separate databases on one server, separate schemas of one database,
 separate servers, or sqlite files in tests. The code is the same in every case. Several modules can
@@ -394,11 +575,41 @@ final class RegisterUser
 | Entry point | Hook | Module |
 |---|---|---|
 | request on `/{module}/…` | `Http\Middleware\SetModuleContext` on the module's routes | the route's module |
+| any route whose controller is a module's class, wherever the route is declared | `RouteMatched` | the module of the controller class |
 | job | `Queue::before` | the module of the job class |
 | command | `CommandStarting` | the module of the command class |
 | event handler | `Dispatcher`, around each handler | the module of the handler class |
+| Laravel event listener declared in a module's `$listen` | `ModuleServiceProvider`, around each listener | the module that declares it |
+| RPC call, from this process or another | `LocalServices`, around the contract's method | the module that implements the contract |
+| queued closure, or any job class outside a module | `Queue::before`, from the Context Laravel carries into the job | the module that queued it |
+| `defer(fn () => …)` | a `DeferredCallbackCollection` that wraps each callback | the module that deferred it |
+| `Concurrency::run()` (`process` driver) | a wrapper around the driver: the child process gets only the closure | the module that started it |
+| `Octane::concurrently()` | a `DispatchesTasks` bound by the package, for the task workers | the module that started it |
 
-Outside a module, the application's default connection is used.
+The last line is why a module never switches databases itself: when analytics calls
+`IamService::findUser()` and iam runs in the same process, iam's implementation still runs in iam's
+context and reads iam's database. The context is restored once the method returns.
+
+For your own deferred work, `ModuleContext::bind($task)` returns a closure that runs `$task` in the
+current module wherever it runs later. It captures only the module's name, so it can be serialized.
+A closure sent to another process (Octane tasks, `Concurrency`, queued closures) is rebuilt by
+`laravel/serializable-closure` from its line in the file: keep one closure per line, or the worker
+may rebuild the wrong one.
+
+The database drivers of the cache, the queue and the session would otherwise keep the connection
+of whichever module used them first. When their `connection` is empty, the package sets it to the
+application's default connection.
+
+Outside a module, the application's default connection is used. Code that isn't in a module (your
+`app/`, a route closure, another package's route, Tinker) therefore never uses a module's models:
+`Apps\Iam\Models\User::query()` there reads the application's database, where `iam_users` doesn't
+exist, and throws `ModuleException` once iam runs in another process. It goes through the module's
+contract, which runs in the module's context and still works when the module runs elsewhere:
+
+```php
+app(\Foundation\Iam\Contracts\IamService::class)->findUser($id);   // never Apps\Iam\Models\User::find($id)
+```
+
 `Services\Modules\ModuleContext::current()` returns the current module (`Data\Module`) or null,
 and `within($module, $callback)` runs a callback in a module's context.
 
@@ -407,6 +618,9 @@ In tests, use `Modulith\Testing\InteractsWithModules`:
 ```php
 $user = $this->inModule('iam', fn () => User::query()->create(['name' => 'ada']));   // iam database
 ```
+
+The trait also turns on Laravel's console events in tests, so `$this->artisan('iam:sync')` runs
+the command in its module's context, as the real console does.
 
 ### Migrations
 
@@ -419,8 +633,8 @@ php artisan migrate | migrate:status | migrate:rollback | migrate:reset | migrat
 
 | Database | Migrations |
 |---|---|
-| the application's default database | `database/migrations`, plus the migrations of modules that have no database |
-| each local module's database, on `{module}_owner` | the package's tables (`event_publications`, `event_consumptions`), `database/migrations`, the module's `database/migrations` and the shadow migrations of the copies it keeps |
+| the application's default database | `database/migrations` and the migrations other packages load with `loadMigrationsFrom()`, plus the migrations of modules that have no database |
+| each local module's database, on `{module}_owner` | the package's tables (`event_publications`, `event_consumptions`), `database/migrations`, the migrations other packages load, the module's `database/migrations` and the shadow migrations of the copies it keeps |
 
 `--module` runs the command for those modules only and skips the application's database. With an
 explicit `--database` or `--path`, the command behaves like the normal Laravel command. Each
@@ -466,16 +680,62 @@ A handler receives the event name and the raw payload.
   "payload":    { "id": 42 },
   "headers":    { "trace_id": "4bf92f35" },
   "emitted_at": "2026-09-30T13:22:41.512000Z",
-  "recipients": []
+  "recipients": [],
+  "stream":     "default",
+  "version":    1
 }
 ```
 
-`emitter` comes from the event's namespace; override `Event::emitter()` to set it yourself. Only
-add fields to a payload. If you need a breaking change, use a new event name.
+`emitter` comes from the event's namespace; override `Event::emitter()` to set it yourself.
 
 `recipients` is optional. When it's empty, every module can handle the event. When you fill it by
 overriding `Event::recipients()`, only the listed modules handle it. The other consumers
 acknowledge it and skip it, and the `queue` transport doesn't deliver it to them at all.
+
+### Versioning a payload
+
+A stream keeps events for a long time, and a consumer may be deployed after the emitter. `version`
+is the version of the payload's shape. It stays at 1 as long as you only add optional fields.
+Renaming a field, removing one or changing what one means raises it.
+
+The module that owns the event declares its versions once, in its foundation, on the payload class:
+
+```php
+// foundation/Iam/Events/UserRegisteredPayload.php
+final class UserRegisteredPayload implements \Modulith\Contracts\Stream\Versioned
+{
+    public static function version(): int { return 3; }
+
+    public static function upcast(int $from, array $payload): array
+    {
+        return match ($from) {
+            1 => ['id' => $payload['id'], 'full_name' => $payload['name']],   // 2 renamed name
+            2 => [...$payload, 'locale' => 'en'],                             // 3 added a required locale
+            default => $payload,
+        };
+    }
+}
+
+// foundation/FoundationServiceProvider.php
+protected array $payloads = ['iam.user.registered' => UserRegisteredPayload::class];
+
+// apps/Iam/app/Events/UserRegistered.php
+public function version(): int { return UserRegisteredPayload::version(); }
+```
+
+Before a handler runs, the payload is lifted one version at a time up to the version the process
+reads. A handler therefore only ever sees the current shape, including for the events written
+before the change, replayed from the outbox or imported from an archive.
+
+| The envelope's version | What happens |
+|---|---|
+| the version the process reads | the handler gets the payload as it is |
+| older | `upcast()` runs once per missing version, then the handler |
+| newer: the emitter was deployed before this consumer | `ModuleException`, no handler runs. On the `redis` transport, `on_failure: block` makes the stream wait for the consumer's deployment; with `skip` the later entries go on and this one comes back after `claim_after` |
+| above 1 for an event with no entry in `$payloads` | the same `ModuleException`: an event without declared versions is read as version 1 only |
+
+Existing databases get the `version` column of `event_publications` from a new migration: run
+`php artisan migrate`.
 
 ### Context propagation
 
@@ -610,17 +870,35 @@ directory:
 
 ```
 foundation/Iam/Contracts/IamService.php      the contract
-foundation/Iam/Services/IamRpcService.php    extends RpcService, calls iam over the network
-foundation/FoundationServiceProvider.php     binds IamService to IamRpcService, unless iam runs here
+foundation/Iam/Services/IamRpcService.php    extends RpcService: every call to iam goes through it
+foundation/FoundationServiceProvider.php     binds IamService to IamRpcService
 apps/Iam/app/Services/IamService.php         implements the contract with iam's own data
-apps/Iam/app/Providers/IamServiceProvider    binds IamService to it when iam runs here
-apps/Iam/routes/rpc.php                      answers the calls, under /iam/rpc/…
+apps/Iam/app/Providers/IamServiceProvider    declares that implementation in $services
 ```
 
-The foundation has one service provider, which the package registers for you. It lists the
-contracts and their `RpcService`, and binds a contract only if no module has bound it already.
-A module that runs in this process binds its own implementation in its provider, so that one is
-used.
+### One path, wherever the module runs
+
+A caller always gets the `RpcService`. Its `call($method, $arguments)` names a method of the
+contract, and the package picks the transport from where the module runs:
+
+```
+analytics ─► IamService (the contract) ─► IamRpcService::call('findUser', ['id' => 1])
+                                                    │
+                              RpcTransportManager: does iam run in this process?
+           ┌────────────────────────────────────────┴───────────────────────────────────────┐
+           │ yes: LocalRpcTransport                                                         │ no: the transport of iam's host (http, or yours)
+           ▼                                                                                ▼
+   iam's $services: Apps\Iam\Services\IamService                         POST {host}/iam/rpc/findUser {contract, arguments}
+   called in iam's context, so its queries                                         │ signed, checked by the `rpc` group
+   land in iam's database                                                          ▼
+                                                                   the same call, in iam's context, on the other side
+```
+
+Both sides end in the same place, `Modulith\Services\Rpc\LocalServices`. It looks up the
+implementation the module declared in `$services`, runs the method in the module's context, then
+returns the answer as JSON decodes it. A caller therefore gets the same thing whether iam runs
+next to it or in another process, and the implementation never has to switch to its own database:
+the package already did. Only a method declared on the contract can be called.
 
 ```php
 // foundation/FoundationServiceProvider.php
@@ -649,29 +927,31 @@ final class IamRpcService extends \Modulith\Services\Rpc\RpcService implements I
         return $this->readThrough(
             "iam:user:{$id}",
             self::DEFAULT_TTL,                                        // a week: iam forgets the key when the user changes
-            fn () => $this->call('users', 'find', ['id' => $id]),    // the raw answer, the one kept in the cache
+            fn () => $this->call('findUser', ['id' => $id]),          // the raw answer, the one kept in the cache
             fn (array $raw) => ['id' => $raw['id'], 'name' => $raw['name']],
         );
     }
 }
 
-// apps/Iam/app/Services/IamService.php
+// apps/Iam/app/Services/IamService.php: a plain query, already in iam's context
 final class IamService implements \Foundation\Iam\Contracts\IamService
 {
-    public function findUser(int $id): ?array { /* query iam's database */ }
-}
+    public function findUser(int $id): ?array
+    {
+        $user = User::query()->find($id);
 
-// apps/Iam/routes/rpc.php
-Route::prefix('v1')->group(function () {
-    Route::post('users/find', fn (Request $r, IamService $iam) => $iam->findUser($r->integer('id')) ?? abort(404));
-});
+        return $user === null ? null : ['id' => $user->id, 'name' => $user->name];
+    }
+}
 ```
 
 Other modules type-hint `Foundation\Iam\Contracts\IamService` and don't need to know where iam
-runs. A call to another process is a `POST {host}/iam/rpc/v1/users/find`, signed with an HMAC of
-the timestamp, a nonce, the path, the body and the propagated context. The `rpc` middleware group
-rejects requests that are unsigned, too old, modified or replayed (each nonce is accepted once,
-using the cache). A 404 response returns `null`.
+runs. The module writes no route: the package serves `POST {module}/rpc/{method}` for every module
+the process runs. A call to another process is signed with an HMAC of the timestamp, a nonce, the
+path, the body and the propagated context, and the `rpc` middleware group rejects a request that
+is unsigned, too old, modified or replayed (each nonce is accepted once, using the cache). A
+`null` answer travels as a 404 and comes back as `null`. A contract with no `RpcService` stays
+bound to the module's implementation, and works only in a process that runs that module.
 
 `RpcService` caches answers with a read-through:
 
@@ -696,7 +976,8 @@ when all processes are deployed with the same `.env`. If a module is deployed wi
 `APP_KEY`, set the same `MODULITH_RPC_SECRET` on both sides, otherwise the calls are rejected with
 a 403.
 
-Calls use the `http` transport unless the host names another one. To add a driver:
+Calls to another process use the `http` transport unless the host names another one. To add a
+driver:
 
 ```php
 // config/modulith.php
@@ -706,6 +987,10 @@ Calls use the `http` transport unless the host names another one. To add a drive
 app(\Modulith\Services\Rpc\RpcTransportManager::class)
     ->extend('grpc', fn ($app, array $config, string $name) => new GrpcRpcTransport($config));
 ```
+
+A transport implements `invoke(Module $module, string $contract, string $method, array $arguments)`.
+Its called side hands the four values to `LocalServices::call()`, as the HTTP endpoint does, so a
+new transport gets the module's context and the answer's shape for free.
 
 ## Read-only copies (shadows)
 
@@ -760,7 +1045,8 @@ its `recipients`, so only those modules update their copy.
 
 `php artisan vendor:publish --tag=modulith-config` publishes `config/modulith.php`, the only
 configuration file. The package reads it only through the classes in `Modulith\Config\`:
-`Modules`, `Streamer`, `RedisStream`, `QueueStream` and `Rpc`.
+`Modules`, `Streamer`, `RedisStream`, `QueueStream` and `Rpc`. What a module's folder must look
+like is not configuration: see [Conventions](#conventions).
 
 | Key | Default | |
 |---|---|---|
@@ -802,14 +1088,15 @@ Stream options, by driver:
 ```
 src/
 ├── Providers/          ModulithServiceProvider · ModuleServiceProvider · FoundationServiceProvider
-├── Http/               Controllers/StatusController · Middleware/{VerifyRpcSignature, SetModuleContext}
-├── Console/Commands/   Install · MakeModule · ListModules · Doctor · PurgeModules · CacheModules · ClearModules · PublishEvents · RepublishEvents · ConsumeEvents
+├── Http/               Controllers/{StatusController, RpcController} · Middleware/{VerifyRpcSignature, SetModuleContext}
+├── Console/Commands/   Install · MakeModule · DeleteModule · ListModules · Doctor · PurgeModules · CacheModules · ClearModules · PublishEvents · RepublishEvents · ConsumeEvents
 │                       TrimEvents · ExportEvents · ImportEvents · AnnounceShadows · WantShadows
 ├── Console/Migrations/ MigrateCommand · StatusCommand · RollbackCommand · ResetCommand · RefreshCommand
 │                       FreshCommand · RunsForEachModule
+├── Console/            ModuleOption · ModuleGenerators · ModuleSeedCommand
 ├── Config/             Modules · Streamer · RedisStream · QueueStream · Rpc
 ├── Contracts/
-│   ├── Stream/         Bus · Transport · Handler · Idempotent · RedeliversEnvelopes · TrimsStreams · TracksAcknowledgements
+│   ├── Stream/         Bus · Transport · Handler · Versioned · Idempotent · RedeliversEnvelopes · TrimsStreams · TracksAcknowledgements
 │   ├── Rpc/            RpcTransport
 │   └── Shadows/        Shadowed
 ├── Data/               Module · Envelope
@@ -817,18 +1104,19 @@ src/
 ├── Migrations/         ShadowMigration
 ├── Jobs/               FailedJobProvider · BatchRepository · Databases
 ├── Traits/             ResolvesModule · ShadowSource
+├── Support/            ModuleDeferredCallbacks · ModuleConcurrencyDriver · ModuleTaskDispatcher · ModuleFactories
 ├── Exceptions/         ModuleException · ConfigurationException
 ├── Events/             Event · ShadowChanged · ShadowWanted
 ├── Handlers/           SyncShadows · AnnounceShadowSource
 ├── Testing/            Boundaries · InteractsWithModules
 ├── Services/
-│   ├── Modules/        ModuleRegistry · DiscoveryCache · ModuleContext · ModuleMigrations
-│   ├── Stream/         Emitter · Dispatcher · EnvelopeFactory · TransportManager · Outbox/{Writer, Relay, Archive}
-│   ├── Rpc/            RpcService · RpcServices · RpcSignature · RpcTransportManager
+│   ├── Modules/        ModuleRegistry · DiscoveryCache · ModuleContext · ModuleMigrations · ComposerAutoload
+│   ├── Stream/         Emitter · Dispatcher · EnvelopeFactory · TransportManager · PayloadVersions · Outbox/{Writer, Relay, Archive}
+│   ├── Rpc/            RpcService · RpcServices · LocalServices · RpcSignature · RpcTransportManager
 │   └── Shadows/        ShadowRegistry
 └── Transports/
     ├── Stream/         RedisStreamTransport · QueueTransport · ArrayTransport · NullTransport
-    └── Rpc/            HttpRpcTransport
+    └── Rpc/            HttpRpcTransport · LocalRpcTransport
 ```
 
 ## Testing

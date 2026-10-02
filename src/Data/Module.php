@@ -21,10 +21,7 @@ final readonly class Module
         public bool $hasDatabase,
     ) {}
 
-    /**
-     * Every convention derives from the name; a module has a database exactly when it declares
-     * its connections in its own config/database.php.
-     */
+    /** Every convention derives from the name; a module has a database once a connection named after it exists, in its config/database.php or the root one. */
     public static function fromName(string $name, string $modulesNamespace, string $modulesPath = 'apps'): self
     {
         if (preg_match('/^[a-z][a-z0-9_]*$/', $name) !== 1) {
@@ -41,7 +38,7 @@ final readonly class Module
             namespace: $namespace,
             provider: $namespace.'\\Providers\\'.$studly.'ServiceProvider',
             path: $path,
-            hasDatabase: is_file($absolute.'/config/database.php'),
+            hasDatabase: is_file($absolute.'/config/database.php') || config("database.connections.{$name}") !== null,
         );
     }
 

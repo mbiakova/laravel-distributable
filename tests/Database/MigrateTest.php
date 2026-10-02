@@ -19,6 +19,15 @@ it('migrates the application database, then each local module database on its ow
         ->and(Schema::hasTable('iam_users'))->toBeFalse();
 });
 
+it('runs the migrations a third-party package loads, in the application database and in each module database', function () {
+    app('migrator')->path(dirname(__DIR__).'/Fixtures/packages/acme/migrations');
+
+    $this->artisan('migrate')->assertSuccessful();
+
+    expect(Schema::hasTable('acme_things'))->toBeTrue()
+        ->and(Schema::connection('iam_owner')->hasTable('acme_things'))->toBeTrue();
+});
+
 it('limits a run to the modules named, and leaves the application database alone', function () {
     $this->artisan('migrate --module=iam')->assertSuccessful();
 

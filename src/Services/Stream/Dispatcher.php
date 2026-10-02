@@ -43,6 +43,7 @@ final class Dispatcher
         private readonly ModuleContext $context,
         private readonly DatabaseManager $db,
         private readonly TransportManager $transports,
+        private readonly PayloadVersions $versions,
     ) {}
 
     /** With a $consumer, only its handlers run: a process running several modules has one consumer per module. */
@@ -117,9 +118,11 @@ final class Dispatcher
             throw ConfigurationException::invalidHandler($class, Handler::class);
         }
 
+        $payload = $this->versions->lift($envelope);
+
         $this->context->within(
             $module,
-            fn () => $this->withContext($envelope->headers, static fn () => $handler->handle($envelope->name, $envelope->payload)),
+            fn () => $this->withContext($envelope->headers, static fn () => $handler->handle($envelope->name, $payload)),
         );
     }
 

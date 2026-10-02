@@ -8,24 +8,34 @@ use Composer\Autoload\ClassLoader;
 use Illuminate\Bus\BatchFactory;
 use Illuminate\Bus\BatchRepository as BatchRepositoryContract;
 use Illuminate\Bus\DatabaseBatchRepository;
+use Illuminate\Concurrency\ConcurrencyManager;
+use Illuminate\Concurrency\ProcessDriver;
+use Illuminate\Console\Command;
+use Illuminate\Console\Events\CommandFinished;
 use Illuminate\Console\Events\CommandStarting;
+use Illuminate\Container\Container;
 use Illuminate\Contracts\Console\Kernel as ConsoleKernel;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\Console\Migrations as Laravel;
+use Illuminate\Database\Console\Seeds\SeedCommand;
 use Illuminate\Database\DatabaseManager;
+use Illuminate\Process\Factory as ProcessFactory;
 use Illuminate\Queue\Events\JobProcessing;
+use Illuminate\Routing\Events\RouteMatched;
 use Illuminate\Routing\Router;
+use Illuminate\Support\Defer\DeferredCallbackCollection;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider as BaseServiceProvider;
+use Laravel\Octane\Contracts\DispatchesTasks;
 use Modulith\Config\Modules;
-use Modulith\Config\Rpc;
 use Modulith\Console\Commands\AnnounceShadows;
 use Modulith\Console\Commands\CacheModules;
 use Modulith\Console\Commands\ClearModules;
 use Modulith\Console\Commands\ConsumeEvents;
+use Modulith\Console\Commands\DeleteModule;
 use Modulith\Console\Commands\Doctor;
 use Modulith\Console\Commands\ExportEvents;
 use Modulith\Console\Commands\ImportEvents;
@@ -38,11 +48,15 @@ use Modulith\Console\Commands\RepublishEvents;
 use Modulith\Console\Commands\TrimEvents;
 use Modulith\Console\Commands\WantShadows;
 use Modulith\Console\Migrations;
+use Modulith\Console\ModuleGenerators;
+use Modulith\Console\ModuleOption;
+use Modulith\Console\ModuleSeedCommand;
 use Modulith\Contracts\Rpc\RpcTransport;
 use Modulith\Contracts\Stream\Bus;
 use Modulith\Contracts\Stream\Transport;
 use Modulith\Data\Module;
 use Modulith\Exceptions\ModuleException;
+use Modulith\Http\Controllers\RpcController;
 use Modulith\Http\Controllers\StatusController;
 use Modulith\Http\Middleware\VerifyRpcSignature;
 use Modulith\Jobs\BatchRepository;
@@ -50,10 +64,16 @@ use Modulith\Jobs\FailedJobProvider;
 use Modulith\Services\Modules\DiscoveryCache;
 use Modulith\Services\Modules\ModuleContext;
 use Modulith\Services\Modules\ModuleRegistry;
+use Modulith\Services\Rpc\LocalServices;
 use Modulith\Services\Rpc\RpcServices;
 use Modulith\Services\Rpc\RpcTransportManager;
 use Modulith\Services\Stream\Emitter;
+use Modulith\Services\Stream\PayloadVersions;
 use Modulith\Services\Stream\TransportManager;
+use Modulith\Support\ModuleConcurrencyDriver;
+use Modulith\Support\ModuleDeferredCallbacks;
+use Modulith\Support\ModuleFactories;
+use Modulith\Support\ModuleTaskDispatcher;
 
 final class ModulithServiceProvider extends BaseServiceProvider
 {
@@ -63,13 +83,20 @@ final class ModulithServiceProvider extends BaseServiceProvider
     {
         $this->mergeConfigFrom(__DIR__.'/../../config/modulith.php', 'modulith');
 
-        // Left null, the database cache store would keep the connection of whichever module first used it.
+        // Left null, these database drivers would keep the connection of whichever module first used them.
         $config = $this->app['config'];
-        $config->set('cache.stores.database.connection', $config->get('cache.stores.database.connection') ?? $config->get('database.default'));
+
+        foreach (['cache.stores.database.connection', 'queue.connections.database.connection', 'session.connection'] as $key) {
+            $config->set($key, $config->get($key) ?? $config->get('database.default'));
+        }
+
+        $this->carryTheModuleIntoDeferredWork();
 
         $this->app->singleton(TransportManager::class);
+        $this->app->singleton(PayloadVersions::class);
         $this->app->singleton(RpcTransportManager::class);
         $this->app->singleton(RpcServices::class);
+        $this->app->singleton(LocalServices::class);
         $this->app->bind(RpcTransport::class, RpcTransportManager::class);
 
         $this->app->singleton(Bus::class, Emitter::class);
@@ -99,12 +126,34 @@ final class ModulithServiceProvider extends BaseServiceProvider
         $this->app->singleton(ModuleContext::class);
         $this->registerQueueDatabases();
         $this->registerModuleMigrations();
+        ModuleFactories::register();
+
+        $this->app->singleton(ModuleGenerators::class);
+        $this->app->afterResolving(Command::class, ModuleOption::addTo(...));
+        $this->app->extend(SeedCommand::class, static fn (mixed $command, Application $app): ModuleSeedCommand => new ModuleSeedCommand($app->make('db')));
 
         // On the booting callback: after every provider (and the app's own configuration)
         // has registered, before any provider boots — module providers slot in between.
         $this->app->booting(function (): void {
             $this->registerLocalModuleProviders();
         });
+    }
+
+    /** Work started in a module but run later or elsewhere (defer, Concurrency, Octane tasks) keeps that module. */
+    private function carryTheModuleIntoDeferredWork(): void
+    {
+        $this->app->scoped(DeferredCallbackCollection::class, ModuleDeferredCallbacks::class);
+
+        $this->app->afterResolving(ConcurrencyManager::class, static function (ConcurrencyManager $manager, Application $app): void {
+            $manager->extend('process', fn (Application $app): ModuleConcurrencyDriver => new ModuleConcurrencyDriver(
+                new ProcessDriver($app->make(ProcessFactory::class)),
+                $app->make(ModuleContext::class),
+            ));
+        });
+
+        if (interface_exists(DispatchesTasks::class)) {
+            $this->app->bind(DispatchesTasks::class, ModuleTaskDispatcher::class);
+        }
     }
 
     /** Laravel's own migrate:* commands, run once per database: the application's, then each local module's. */
@@ -143,19 +192,38 @@ final class ModulithServiceProvider extends BaseServiceProvider
             : $repository);
     }
 
-    /** A job or command runs in the context of the module owning its class, batch counters included. */
+    /** A controller, job or command runs in the context of the module owning its class, batch counters included. */
     private function switchContextOnJobsAndCommands(): void
     {
+        // Wherever the route is declared: a module's own file, routes/web.php or another package.
+        Event::listen(RouteMatched::class, static function (RouteMatched $event): void {
+            $app = Container::getInstance();
+            $module = $app->make(ModuleRegistry::class)->forClass((string) $event->route->getControllerClass());
+
+            if ($module !== null) {
+                $app->make(ModuleContext::class)->switchTo($module);
+            }
+        });
+
         Event::listen(CommandStarting::class, function (CommandStarting $event): void {
             $command = $this->app->make(ConsoleKernel::class)->all()[$event->command] ?? null;
 
             if ($command !== null) {
                 $this->app->make(ModuleContext::class)->switchToModuleOf($command::class);
             }
+
+            // --module on any command (db:seed, tinker, model:show…) names the module it runs in.
+            if (is_string($named = $event->input->getParameterOption('--module', null))) {
+                $this->app->make(ModuleContext::class)->switchTo($this->app->make(ModuleRegistry::class)->get($named));
+            }
         });
 
         Queue::before(function (JobProcessing $event): void {
-            $this->app->make(ModuleContext::class)->switchToModuleOf($event->job->resolveName());
+            $context = $this->app->make(ModuleContext::class);
+
+            // Laravel has just restored the Context the job was dispatched with, module included:
+            // a job class outside every module (a queued closure) runs in the module that queued it.
+            $context->switchTo($this->app->make(ModuleRegistry::class)->forClass($event->job->resolveName()) ?? $context->current());
 
             if ($this->app->resolved(BatchRepositoryContract::class)
                 && ($repository = $this->app->make(BatchRepositoryContract::class)) instanceof BatchRepository) {
@@ -203,6 +271,9 @@ final class ModulithServiceProvider extends BaseServiceProvider
 
         foreach ($registry->local() as $module) {
             $loader->addPsr4($module->namespace.'\\', $module->classPath());
+            $loader->addPsr4($module->namespace.'\\Database\\Factories\\', $module->path().'/database/factories');
+            $loader->addPsr4($module->namespace.'\\Database\\Seeders\\', $module->path().'/database/seeders');
+            $loader->addPsr4($module->namespace.'\\Tests\\', $module->path().'/tests');
         }
 
         $loader->register();
@@ -232,8 +303,16 @@ final class ModulithServiceProvider extends BaseServiceProvider
             __DIR__.'/../../config/modulith.php' => config_path('modulith.php'),
         ], 'modulith-config');
 
-        // Every module's routes/rpc.php lands in this group: nothing unsigned reaches it.
+        // The called side of HttpRpcTransport, one endpoint per local module: nothing unsigned reaches it.
         $this->app->make(Router::class)->pushMiddlewareToGroup('rpc', VerifyRpcSignature::class);
+
+        foreach ($this->app->make(ModuleRegistry::class)->local() as $module) {
+            Route::post("{$module->name}/rpc/{method}", RpcController::class)
+                ->middleware('rpc')
+                ->defaults('module', $module->name)
+                ->name("modulith.rpc.{$module->name}");
+        }
+
         $this->switchContextOnJobsAndCommands();
 
         $statusRoute = $this->app->make(Modules::class)->getStatusRoute();
@@ -245,8 +324,11 @@ final class ModulithServiceProvider extends BaseServiceProvider
         $this->optimizes(optimize: 'modulith:cache', clear: 'modulith:clear', key: 'modulith');
 
         if ($this->app->runningInConsole()) {
+            Event::listen(CommandStarting::class, fn (CommandStarting $event) => $this->app->make(ModuleGenerators::class)->starting($event));
+            Event::listen(CommandFinished::class, fn (CommandFinished $event) => $this->app->make(ModuleGenerators::class)->finished($event));
+
             $this->commands([
-                Install::class, MakeModule::class, ListModules::class, Doctor::class, PurgeModules::class,
+                Install::class, MakeModule::class, DeleteModule::class, ListModules::class, Doctor::class, PurgeModules::class,
                 CacheModules::class, ClearModules::class, PublishEvents::class, RepublishEvents::class, ConsumeEvents::class,
                 TrimEvents::class, ExportEvents::class, ImportEvents::class, AnnounceShadows::class, WantShadows::class,
             ]);

@@ -12,7 +12,7 @@ use Modulith\Contracts\Rpc\RpcTransport;
 use Modulith\Data\Module;
 use Modulith\Services\Rpc\RpcSignature;
 
-/** POST {host}/{module}/rpc/v1/{resource}/{operation}, signed, carrying the propagated context. */
+/** POST {host}/{module}/rpc/{method} with {contract, arguments}, signed, carrying the propagated context. */
 final readonly class HttpRpcTransport implements RpcTransport
 {
     public function __construct(
@@ -22,10 +22,10 @@ final readonly class HttpRpcTransport implements RpcTransport
         private RpcSignature $signature,
     ) {}
 
-    public function invoke(Module $module, string $resource, string $operation, array $payload = []): mixed
+    public function invoke(Module $module, string $contract, string $method, array $arguments = []): mixed
     {
-        $path = "/{$module->name}/rpc/v1/{$resource}/{$operation}";
-        $body = json_encode($payload, JSON_THROW_ON_ERROR);
+        $path = "/{$module->name}/rpc/{$method}";
+        $body = json_encode(['contract' => $contract, 'arguments' => (object) $arguments], JSON_THROW_ON_ERROR);
         $context = json_encode(Context::only($this->streamer->getPropagate()), JSON_THROW_ON_ERROR);
 
         $response = $this->http

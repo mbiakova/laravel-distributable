@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 namespace Apps\Iam\Models;
 
+use Apps\Iam\Database\Factories\UserFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Modulith\Contracts\Shadows\Shadowed;
 use Modulith\Traits\ShadowSource;
 
 final class User extends Model implements Shadowed
 {
+    /** @use HasFactory<UserFactory> */
+    use HasFactory;
+
     use ShadowSource;
 
     protected $table = 'iam_users';

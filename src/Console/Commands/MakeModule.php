@@ -7,6 +7,7 @@ namespace Modulith\Console\Commands;
 use Illuminate\Console\Command;
 use Modulith\Config\Modules;
 use Modulith\Data\Module;
+use Modulith\Services\Modules\ComposerAutoload;
 
 final class MakeModule extends Command
 {
@@ -16,7 +17,7 @@ final class MakeModule extends Command
 
     protected $description = 'Create a module and its foundation directory.';
 
-    public function handle(Modules $config): int
+    public function handle(Modules $config, ComposerAutoload $autoload): int
     {
         $module = Module::fromName((string) $this->argument('name'), $config->getModulesNamespace(), $config->getModulesPath());
 
@@ -67,6 +68,10 @@ final class MakeModule extends Command
 
         $this->components->info("Module [{$module->name}] created at {$module->path()}.");
         $this->declare($module);
+
+        if ($autoload->add([...$autoload->foundationEntries(), ...$autoload->entriesOf($module)], $autoload->devEntriesOf($module))) {
+            $this->components->info('Added to composer.json, for your IDE: run composer dump-autoload.');
+        }
 
         return self::SUCCESS;
     }

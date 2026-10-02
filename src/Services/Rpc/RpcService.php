@@ -38,10 +38,18 @@ abstract class RpcService
 
     public function __construct(protected readonly RpcTransport $transport) {}
 
-    /** @param array<string, mixed> $payload */
-    protected function call(string $resource, string $operation, array $payload = []): mixed
+    /**
+     * Calls $method of the contract this service is mapped to, on the module that implements it:
+     * in this process when it runs here, over its transport otherwise.
+     *
+     * @param  array<string, mixed>  $arguments  by name, as the contract's method declares them
+     */
+    protected function call(string $method, array $arguments = []): mixed
     {
-        return $this->transport->invoke($this->module, $resource, $operation, $payload);
+        $contract = app(RpcServices::class)->contractOf(static::class)
+            ?? throw ModuleException::unmappedRpcService(static::class);
+
+        return $this->transport->invoke($this->module, $contract, $method, $arguments);
     }
 
     /**

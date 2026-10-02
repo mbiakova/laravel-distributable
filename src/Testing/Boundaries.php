@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modulith\Testing;
 
+use Illuminate\Support\Str;
 use Modulith\Config\Modules;
 use Modulith\Data\Module;
 use Modulith\Services\Modules\ModuleRegistry;
@@ -12,7 +13,7 @@ use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use SplFileInfo;
 
-/** A module names only itself and the foundation; the foundation names no module. */
+/** A module names only itself and the foundation, never another module's connection or tables; the foundation and the application name no module. */
 final readonly class Boundaries
 {
     public function __construct(
@@ -28,6 +29,7 @@ final readonly class Boundaries
 
         foreach ($modules as $module) {
             $others = array_values(array_filter($modules, static fn (Module $other): bool => $other->name !== $module->name));
+            $foreign = array_merge(...array_map(fn (Module $other): array => $this->storageOf($other), $others));
 
             foreach ($this->references($module->path()) as $file => $names) {
                 foreach ($names as $name) {
@@ -36,27 +38,70 @@ final readonly class Boundaries
                     }
                 }
             }
-        }
 
-        foreach ($this->references($this->config->getFoundationPath()) as $file => $names) {
-            foreach ($names as $name) {
-                if ($this->startsWithAny($name, [$this->config->getModulesNamespace()])) {
-                    $violations[] = "{$file}: {$name}";
+            foreach ($this->strings($module->path()) as $file => $strings) {
+                foreach (array_intersect($strings, $foreign) as $string) {
+                    $violations[] = "{$file}: '{$string}'";
                 }
             }
         }
 
-        return $violations;
+        $modulePaths = array_map(static fn (Module $module): string => $module->path().DIRECTORY_SEPARATOR, $modules);
+
+        foreach ([$this->config->getFoundationPath(), app_path(), base_path('routes'), config_path()] as $outside) {
+            foreach ($this->references($outside) as $file => $names) {
+                if (Str::startsWith($file, $modulePaths)) {
+                    continue;
+                }
+
+                foreach ($names as $name) {
+                    if ($this->startsWithAny($name, [$this->config->getModulesNamespace()])) {
+                        $violations[] = "{$file}: {$name}";
+                    }
+                }
+            }
+        }
+
+        return array_values(array_unique($violations));
+    }
+
+    /** @return list<string> the module's two connections and every table its migrations create */
+    private function storageOf(Module $module): array
+    {
+        $tables = [];
+
+        foreach (glob($module->path().'/database/migrations/*.php') ?: [] as $migration) {
+            preg_match_all('/Schema::create\(\s*[\'"]([^\'"]+)[\'"]/', (string) file_get_contents($migration), $matches);
+            array_push($tables, ...$matches[1]);
+        }
+
+        return [$module->connection(), $module->ownerConnection(), ...$tables];
     }
 
     /** @return array<string, list<string>> the qualified names each PHP file under $path references */
     private function references(string $path): array
     {
+        return $this->tokens($path, [T_NAME_QUALIFIED, T_NAME_FULLY_QUALIFIED], static fn (string $text): string => ltrim($text, '\\'));
+    }
+
+    /** @return array<string, list<string>> the plain string literals of each PHP file under $path */
+    private function strings(string $path): array
+    {
+        return $this->tokens($path, [T_CONSTANT_ENCAPSED_STRING], static fn (string $text): string => substr($text, 1, -1));
+    }
+
+    /**
+     * @param  list<int>  $kinds
+     * @param  callable(string): string  $value
+     * @return array<string, list<string>>
+     */
+    private function tokens(string $path, array $kinds, callable $value): array
+    {
         if (! is_dir($path)) {
             return [];
         }
 
-        $references = [];
+        $found = [];
 
         /** @var SplFileInfo $file */
         foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($path, RecursiveDirectoryIterator::SKIP_DOTS)) as $file) {
@@ -65,13 +110,13 @@ final readonly class Boundaries
             }
 
             foreach (PhpToken::tokenize((string) file_get_contents($file->getPathname())) as $token) {
-                if ($token->is([T_NAME_QUALIFIED, T_NAME_FULLY_QUALIFIED])) {
-                    $references[$file->getPathname()][] = ltrim($token->text, '\\');
+                if ($token->is($kinds)) {
+                    $found[$file->getPathname()][] = $value($token->text);
                 }
             }
         }
 
-        return $references;
+        return $found;
     }
 
     /** @param list<string> $namespaces */

@@ -6,12 +6,13 @@ namespace Modulith\Contracts\Rpc;
 
 use Modulith\Data\Module;
 
-/** Carries a call to a module running in another process; the operation is data, not a method. */
+/** Carries a call to a method of a foundation contract, answered by the module that implements it. */
 interface RpcTransport
 {
     /**
-     * @param  array<string, mixed>  $payload
-     * @return mixed the decoded answer, null when the module has no such record
+     * @param  class-string  $contract
+     * @param  array<string, mixed>  $arguments  the method's arguments, by name
+     * @return mixed the answer decoded as JSON would decode it; null when there is none
      */
-    public function invoke(Module $module, string $resource, string $operation, array $payload = []): mixed;
+    public function invoke(Module $module, string $contract, string $method, array $arguments = []): mixed;
 }

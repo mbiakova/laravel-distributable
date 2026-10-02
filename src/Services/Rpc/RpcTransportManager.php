@@ -10,11 +10,14 @@ use Modulith\Config\Rpc;
 use Modulith\Contracts\Rpc\RpcTransport;
 use Modulith\Data\Module;
 use Modulith\Exceptions\ConfigurationException;
+use Modulith\Services\Modules\ModuleRegistry;
 use Modulith\Transports\Rpc\HttpRpcTransport;
+use Modulith\Transports\Rpc\LocalRpcTransport;
 
 /**
- * Resolves a named transport of rpc.transports, and routes each call to the one its module's host
- * names: extend('grpc', fn ($app, array $config, string $name) => …) registers any driver.
+ * Routes each call: to the module itself when it runs in this process, otherwise to the named
+ * transport of modulith.rpc.transports its host names. extend('grpc', fn ($app, array $config,
+ * string $name) => …) registers any driver.
  */
 final class RpcTransportManager implements RpcTransport
 {
@@ -26,19 +29,29 @@ final class RpcTransportManager implements RpcTransport
 
     public function __construct(
         private readonly Container $container,
-        private readonly Rpc $config,
+        private readonly ModuleRegistry $registry,
     ) {}
 
-    public function invoke(Module $module, string $resource, string $operation, array $payload = []): mixed
+    public function invoke(Module $module, string $contract, string $method, array $arguments = []): mixed
     {
-        return $this->transport($this->config->getTransportOf($module->name))->invoke($module, $resource, $operation, $payload);
+        $transport = $this->registry->isLocal($module->name)
+            ? $this->container->make(LocalRpcTransport::class)
+            : $this->transport($this->config()->getTransportOf($module->name));
+
+        return $transport->invoke($module, $contract, $method, $arguments);
     }
 
     public function transport(?string $name = null): RpcTransport
     {
-        $name ??= $this->config->getDefaultTransport();
+        $name ??= $this->config()->getDefaultTransport();
 
-        return $this->transports[$name] ??= $this->create($name, $this->config->getTransport($name));
+        return $this->transports[$name] ??= $this->create($name, $this->config()->getTransport($name));
+    }
+
+    /** From the running application, like ModuleContext's: Octane serves each request from its own copy. */
+    private function config(): Rpc
+    {
+        return \Illuminate\Container\Container::getInstance()->make(Rpc::class);
     }
 
     /** @param Closure(Container, array<string, mixed>, string): RpcTransport $creator */

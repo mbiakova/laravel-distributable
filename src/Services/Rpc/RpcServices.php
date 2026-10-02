@@ -21,4 +21,16 @@ final class RpcServices
     {
         return $this->services;
     }
+
+    /** @return class-string|null the contract $rpc is mapped to */
+    public function contractOf(string $rpc): ?string
+    {
+        foreach ($this->services as $contract => $service) {
+            if ($service['rpc'] === $rpc) {
+                return $contract;
+            }
+        }
+
+        return null;
+    }
 }

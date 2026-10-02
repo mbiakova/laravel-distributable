@@ -113,6 +113,7 @@ final class Relay
             'emitted_at' => $row->emitted_at,
             'recipients' => json_decode((string) $row->recipients, true, 512, JSON_THROW_ON_ERROR),
             'stream' => $row->stream,
+            'version' => $row->version,
         ]);
     }
 

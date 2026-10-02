@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modulith\Console\Migrations;
 
 use Modulith\Migrations\ShadowMigration;
+use Modulith\Services\Modules\ModuleContext;
 use Modulith\Services\Modules\ModuleMigrations;
 use Modulith\Services\Modules\ModuleRegistry;
 use Symfony\Component\Console\Input\InputOption;
@@ -42,7 +43,12 @@ trait RunsForEachModule
 
             $this->components->info("Module [{$module->name}]");
             ShadowMigration::$keeper = $module->name;
-            $exitCode = $this->runOn($module->ownerConnection(), $migrations->forModule($module));
+
+            // In the module's context, so --seed runs the module's own seeders and not the application's again.
+            $exitCode = $this->laravel->make(ModuleContext::class)->within(
+                $module,
+                fn (): int => $this->runOn($module->ownerConnection(), $migrations->forModule($module)),
+            );
         }
 
         return $exitCode;

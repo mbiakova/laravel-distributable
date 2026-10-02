@@ -6,6 +6,7 @@ namespace Modulith\Console\Commands;
 
 use Illuminate\Console\Command;
 use Modulith\Config\Modules;
+use Modulith\Services\Modules\ComposerAutoload;
 
 final class Install extends Command
 {
@@ -13,7 +14,7 @@ final class Install extends Command
 
     protected $description = 'Publish config/modulith.php and create the modules and foundation directories.';
 
-    public function handle(Modules $config): int
+    public function handle(Modules $config, ComposerAutoload $autoload): int
     {
         if (! is_file(config_path('modulith.php'))) {
             copy(dirname(__DIR__, 3).'/config/modulith.php', config_path('modulith.php'));
@@ -43,6 +44,8 @@ final class Install extends Command
 
                 PHP);
         }
+
+        $autoload->add($autoload->foundationEntries());
 
         $this->components->info('Laravel Modulith is installed. Next: php artisan modulith:make-module <name> [--database]');
 

@@ -33,6 +33,7 @@ final class Writer
             'emitted_at' => $envelope->emittedAt,
             'recipients' => json_encode($envelope->recipients, JSON_THROW_ON_ERROR),
             'stream' => $envelope->stream,
+            'version' => $envelope->version,
         ]);
     }
 }

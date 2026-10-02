@@ -17,7 +17,7 @@ use stdClass;
 /** Moves published outbox rows to a JSON-lines file and back, in batches. */
 final class Archive
 {
-    private const array COLUMNS = ['id', 'emitter', 'name', 'payload', 'headers', 'emitted_at', 'recipients', 'stream'];
+    private const array COLUMNS = ['id', 'emitter', 'name', 'payload', 'headers', 'emitted_at', 'recipients', 'stream', 'version'];
 
     public function __construct(
         private readonly DatabaseManager $db,
@@ -85,7 +85,9 @@ final class Archive
 
             /** @var array<string, mixed> $row */
             $row = json_decode($line, true, 512, JSON_THROW_ON_ERROR);
-            $pending[(string) $row['emitter']][] = $row;
+
+            // A file exported before payloads had a version: every row of a batch needs the same columns.
+            $pending[(string) $row['emitter']][] = $row + ['version' => 1];
 
             if (count($pending, COUNT_RECURSIVE) - count($pending) >= $batch) {
                 $imported += $this->insert($pending);

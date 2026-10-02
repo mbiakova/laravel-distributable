@@ -32,9 +32,16 @@ it('serves a module route file under the {module}/{file} prefix', function () {
 });
 
 it('wraps a route file in the middleware group of the same name when one exists', function () {
-    $route = $this->app->make(Router::class)->getRoutes()->match(Request::create('/iam/rpc/v1/users/find', 'POST'));
+    $route = $this->app->make(Router::class)->getRoutes()->match(Request::create('/iam/admin/hello'));
 
-    expect($route->gatherMiddleware())->toContain('rpc');
+    expect($route->gatherMiddleware())->toContain('admin');
+});
+
+it('serves the RPC endpoint of each local module inside the signed rpc group', function () {
+    $route = $this->app->make(Router::class)->getRoutes()->match(Request::create('/iam/rpc/findUser', 'POST'));
+
+    expect($route->gatherMiddleware())->toContain('rpc')
+        ->and($route->defaults['module'])->toBe('iam');
 });
 
 it('deep-merges the module config over the root config', function () {
@@ -43,10 +50,23 @@ it('deep-merges the module config over the root config', function () {
         ->and(config('iam.nested'))->toBe(['kept' => 'root', 'override' => 'module']);
 });
 
+it('merges an array keyed by integers key by key, as it does any other map', function () {
+    expect(config('iam.codes'))->toBe([403 => 'root forbidden', 404 => 'module not found']);
+});
+
 it('appends a list item once, however many times it is declared', function () {
     $this->app->register(IamServiceProvider::class, force: true);
 
     expect(config('iam.items'))->toBe(['from-root', 'from-module']);
+});
+
+it('keeps the cached config as it is, instead of merging the module config over it again', function () {
+    $this->app->instance('config_loaded_from_cache', true);
+    config()->set('iam.flag', 'cached');
+
+    $this->app->register(IamServiceProvider::class, force: true);
+
+    expect(config('iam.flag'))->toBe('cached');
 });
 
 it('loads the module translations under the module namespace', function () {

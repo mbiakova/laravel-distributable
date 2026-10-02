@@ -14,6 +14,11 @@ final class ConfigurationException extends RuntimeException
         return new self("Event handler [{$class}] must implement {$contract}.");
     }
 
+    public static function unversionedPayload(string $class, string $contract): self
+    {
+        return new self("[{$class}] is in the \$payloads map of the FoundationServiceProvider: it must implement {$contract}.");
+    }
+
     public static function unknownStream(string $name): self
     {
         return new self("Stream [{$name}] is not declared: add it to modulith.events.streams.");

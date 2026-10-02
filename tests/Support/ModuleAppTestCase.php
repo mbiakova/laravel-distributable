@@ -28,6 +28,9 @@ abstract class ModuleAppTestCase extends TestCase
         $config->set('modulith.paths.foundation', dirname(__DIR__).'/Fixtures/foundation');
         $config->set('modulith.status_route', '/');
 
+        // The group iam's routes/admin.php lands in.
+        $app->make('router')->middlewareGroup('admin', []);
+
         $config->set('modulith.events.streams.default.driver', 'array');
         $config->set('modulith.rpc.secret', 'test-secret');
 
@@ -35,6 +38,7 @@ abstract class ModuleAppTestCase extends TestCase
         $config->set('iam', [
             'items' => ['from-root'],
             'nested' => ['kept' => 'root', 'override' => 'root'],
+            'codes' => [403 => 'root forbidden', 404 => 'root not found'],
         ]);
 
     }

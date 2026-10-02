@@ -1,0 +1,24 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Apps\Iam\Listeners;
+
+use Illuminate\Support\Facades\DB;
+use Modulith\Tests\Support\SomethingHappened;
+
+final class RecordEventConnection
+{
+    /** @var list<string> */
+    public static array $seen = [];
+
+    public function handle(SomethingHappened $event): void
+    {
+        self::$seen[] = 'handle:'.DB::getDefaultConnection();
+    }
+
+    public function remember(SomethingHappened $event): void
+    {
+        self::$seen[] = 'remember:'.DB::getDefaultConnection();
+    }
+}

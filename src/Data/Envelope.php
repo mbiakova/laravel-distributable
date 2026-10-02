@@ -30,6 +30,7 @@ final readonly class Envelope
         public CarbonImmutable $emittedAt,
         public array $recipients = [],
         public string $stream = 'default',
+        public int $version = 1,
     ) {}
 
     /** @param array<string, mixed> $headers */
@@ -45,6 +46,7 @@ final readonly class Envelope
             emittedAt: Date::now()->toImmutable(),
             recipients: $event->recipients(),
             stream: $stream,
+            version: $event->version(),
         );
     }
 
@@ -65,6 +67,7 @@ final readonly class Envelope
             'emitted_at' => $this->emittedAt->toIso8601ZuluString('microsecond'),
             'recipients' => $this->recipients,
             'stream' => $this->stream,
+            'version' => $this->version,
         ];
     }
 
@@ -80,6 +83,7 @@ final readonly class Envelope
             emittedAt: CarbonImmutable::parse((string) $data['emitted_at']),
             recipients: array_values(array_map(strval(...), (array) ($data['recipients'] ?? []))),
             stream: (string) ($data['stream'] ?? 'default'),
+            version: (int) ($data['version'] ?? 1),
         );
     }
 

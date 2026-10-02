@@ -33,4 +33,10 @@ abstract class Event
     {
         return null;
     }
+
+    /** The version of the payload's shape: raised when a field is renamed, removed or changes meaning. */
+    public function version(): int
+    {
+        return 1;
+    }
 }
