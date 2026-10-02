@@ -56,3 +56,19 @@ it('deletes the folder of the modules this process does not run, which config st
         File::deleteDirectory($root);
     }
 });
+
+it('lists the packages only the modules running elsewhere require', function () {
+    $root = sys_get_temp_dir().'/modulith-packages-'.uniqid();
+    File::copyDirectory(dirname(__DIR__).'/Fixtures/apps', $root);
+    config()->set('modulith.paths.modules', $root);
+    $this->app->forgetInstance(ModuleRegistry::class);
+
+    File::put($root.'/Iam/composer.json', json_encode(['require' => ['php' => '^8.4', 'ext-json' => '*', 'acme/only-iam' => '^1.0', 'acme/shared' => '^1.0']]));
+    File::put($root.'/Gateway/composer.json', json_encode(['require' => ['acme/shared' => '^1.0', 'acme/only-gateway' => '^1.0']]));
+
+    try {
+        $this->artisan('modulith:unused-packages')->expectsOutput('acme/only-iam')->assertSuccessful();
+    } finally {
+        File::deleteDirectory($root);
+    }
+});

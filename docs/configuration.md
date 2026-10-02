@@ -46,7 +46,7 @@ Stream options, by driver:
 src/
 ├── Providers/          ModulithServiceProvider · ModuleServiceProvider · FoundationServiceProvider
 ├── Http/               Controllers/{StatusController, RpcController} · Middleware/{VerifyRpcSignature, SetModuleContext}
-├── Console/Commands/   Install · MakeModule · DeleteModule · ListModules · Doctor · PurgeModules · CacheModules · ClearModules · PublishEvents · RepublishEvents · ConsumeEvents
+├── Console/Commands/   Install · MakeModule · DeleteModule · ListModules · Doctor · PurgeModules · UnusedPackages · CacheModules · ClearModules · PublishEvents · RepublishEvents · ConsumeEvents
 │                       TrimEvents · ExportEvents · ImportEvents · AnnounceShadows · WantShadows
 ├── Console/Migrations/ MigrateCommand · StatusCommand · RollbackCommand · ResetCommand · RefreshCommand
 │                       FreshCommand · RunsForEachModule

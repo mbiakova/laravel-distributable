@@ -101,8 +101,9 @@ module's run. A module without one is skipped.
 
 ## Conventions
 
-Only the four roots are configuration. Everything inside them is a convention: the package reads
-it from the folder and the namespace, and no option changes it.
+A module is laid out like a Laravel application, by convention, the way Laravel itself expects
+`app/Models` or `routes/web.php`. You choose the four roots in the configuration; inside them, the
+package reads everything from the folder and the namespace, so there is nothing to register.
 
 | | Configurable | Fixed by convention |
 |---|---|---|
@@ -120,10 +121,10 @@ it from the folder and the namespace, and no option changes it.
 | The migration of a copy | | `{paths.foundation}/{Owner}/database/shadows/` |
 | The foundation's provider | | `{namespaces.foundation}\FoundationServiceProvider` |
 
-They are fixed on purpose. Because the folder says everything, a module is found without being
-registered, `modulith:purge` can delete a whole folder, `Boundaries` knows which module owns a file,
-and an RPC service knows which module it calls. A setting for each would make those guarantees
-depend on configuration that every process must get right.
+These conventions are what the features are built on. Because the folder says everything, a module
+is found without being registered, `modulith:purge` can delete a whole folder, `Boundaries` knows
+which module owns a file, and an RPC service knows which module it calls. With a setting for each,
+those guarantees would depend on configuration that every process must get right.
 
 ## Which modules a process runs
 
@@ -164,6 +165,35 @@ MODULITH_RUNS=analytics php artisan modulith:purge --force
 Run it in your Dockerfile, after copying the code and before `composer dump-autoload`. Starting an
 image with a module in `MODULITH_RUNS` whose folder was purged fails at boot, with the name of the
 module.
+
+## The dependencies of a module
+
+The package reads no `composer.json` of its own accord: by default every dependency is in the root
+one. A module can declare the libraries only it uses in `{module}/composer.json`, merged into the
+root file by [wikimedia/composer-merge-plugin](https://github.com/wikimedia/composer-merge-plugin).
+There is still one `composer.lock` and one `vendor/`.
+
+```json
+// apps/Iam/composer.json
+{ "require": { "spatie/laravel-permission": "^8.3" } }
+
+// composer.json
+"extra": { "merge-plugin": { "include": ["apps/*/composer.json"] } }
+```
+
+An image built for some modules can then leave out what only the others require.
+`modulith:unused-packages` prints those packages. Run it before `modulith:purge`, which deletes the
+files it reads, and name the packages to Composer so that it removes them and changes no other
+version:
+
+```bash
+UNUSED="$(MODULITH_RUNS=analytics php artisan modulith:unused-packages)"   # spatie/laravel-permission
+MODULITH_RUNS=analytics php artisan modulith:purge --force
+[ -z "$UNUSED" ] || { composer update $UNUSED --no-dev --no-scripts; rm -f bootstrap/cache/packages.php bootstrap/cache/services.php; }
+composer dump-autoload --optimize --no-dev
+```
+
+A package the root `composer.json` or a module this process runs also requires is never listed.
 
 With `MODULITH_STATUS_ROUTE=/`, the process returns the modules it runs:
 

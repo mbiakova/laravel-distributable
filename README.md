@@ -1,9 +1,10 @@
 # Laravel Modulith
 
-Laravel Modulith splits a Laravel application into modules. Each module has its own database and
-talks to the other modules only through events and RPC calls. You can run all the modules in one
-process, or move some of them to their own process by setting `MODULITH_RUNS`. The code doesn't
-change.
+Laravel Modulith is for building a Laravel application as distributed modules. Each module has its
+own database and talks to the other modules only through events and RPC calls. You can run all the modules in one
+process, or move some of them to their own process by setting `MODULITH_RUNS`. The image of that
+process can then be built without the code of the other modules (`modulith:purge`), like an
+independent microservice. The code doesn't change.
 
 ```bash
 composer require mk-josias/laravel-modulith
@@ -35,13 +36,24 @@ The rest of the documentation is in `docs/`:
 
 ## Why
 
-Microservices give each part of a system its own data and its own deployment, but you pay for
-every service from the first day: servers, databases, pipelines. Most applications don't have the
-traffic to justify that at the start.
+Microservices give each part of a system its own data and its own deployment. That has a price
+from the first day, paid per service: servers, databases, pipelines, and the work of running them.
+What it buys is often less than it seems:
 
-With this package you write each module as if it were a separate service: it owns its database,
-shares no tables and never calls another module's classes. Where the modules run is decided by
-the environment, and you can change it later:
+- **Scaling.** Only the part under load needs to scale. Making every part a service from the
+  start doesn't follow from that.
+- **Infrastructure.** Services that end up in the same stack, run by the same team, cost more to
+  operate than one process and gain nothing from being apart.
+- **Isolation.** Splitting the code across services rarely protects it: on most projects the same
+  people have access to every repository.
+
+What is hard to add later is the separation itself: each part owning its data and talking to the
+others through contracts. Where each part runs is easy to change, once that separation exists.
+
+So with this package you write each module as if it were a separate service: it owns its
+database, shares no tables and never calls another module's classes. Where the modules run is
+decided by the environment. Modules that have no reason to be apart stay together in one process,
+and you move out only the one whose load justifies it:
 
 ```dotenv
 # at first, every module in one process
@@ -54,7 +66,9 @@ MODULITH_RUNS=iam,analytics       # process B
 
 Because a module already owns its data and only talks through events and contracts, moving it to
 its own process doesn't require a rewrite. Events go through a stream in both setups, so they
-behave the same whether two modules share a process or not.
+behave the same whether two modules share a process or not. The image of a process can leave out
+the source code of the modules it doesn't run (`modulith:purge`), and `modulith:doctor` reports
+what would stop a module from running apart, such as one module importing another's class.
 
 ## How it works
 
@@ -81,7 +95,7 @@ Modules communicate in two ways:
 | Mode | Used for | Same process | Different processes |
 |---|---|---|---|
 | Event stream (asynchronous) | announcing that something happened | through the stream | through the stream |
-| RPC (synchronous) | reading data another module owns | the module's own class, in its context | a signed HTTP call |
+| RPC (synchronous) | asking another module for an answer right away: reading its data, or having it perform an action whose result the caller needs | the module's own class, in its context | a signed HTTP call |
 
 Shadows, the read-only copies described below, are built on events.
 
@@ -129,15 +143,16 @@ The package defines the envelope format, which is why transports can be swapped.
 
 ### Working with other packages
 
-The package changes a few things in Laravel. A third-party package keeps working unless it relies
-on one of them:
+Third-party packages work as they do in any Laravel application. The package uses a few of
+Laravel's own extension points to give each module its database; this table says what each one
+does, so you know where a package's data ends up:
 
-| What the package changes | Where | What it means for another package |
+| What the package does | Where | What it means for another package |
 |---|---|---|
-| `database.default` follows the module the code runs in | `ModuleContext` | A package writing through the default connection (media, activity log, permissions) writes into the current module's database. Its migrations run in every module database, so its tables are there. A package that must keep one global store (Telescope, Pulse) sets its own `connection` key to the application's connection. |
-| `migrate`, `migrate:status`, `migrate:rollback`, `migrate:reset`, `migrate:refresh`, `migrate:fresh` | `ModulithServiceProvider::registerModuleMigrations()` | They run once per database, including the migrations packages load with `loadMigrationsFrom()` and the ones you publish to `database/migrations`. Another package that also replaces these commands conflicts: the last one registered wins. |
-| `queue.failer` and the job batch repository, with the `database` drivers only | `registerQueueDatabases()` | Failed jobs and batches go to the database of the module owning the job. Other drivers (Horizon, `file`, DynamoDB) are left alone. |
-| The database connection of the `database` cache, queue and session drivers | `register()` | It is pinned to the application's connection when the config leaves it empty, so it never follows a module. |
+| While a module's code runs, `database.default` is that module's connection | `ModuleContext` | A package that uses the default connection (a media library, an activity log, permissions) stores its rows in the database of the module that calls it, so each module has its own. Its tables are there because its migrations run in every module database. A package that should keep one store for the whole application (Telescope, Pulse) is given the application's connection in its own config file. |
+| `migrate`, `migrate:status`, `migrate:rollback`, `migrate:reset`, `migrate:refresh` and `migrate:fresh` run once per database | `ModulithServiceProvider::registerModuleMigrations()` | A package's migrations, loaded with `loadMigrationsFrom()` or published to `database/migrations`, run in each database with nothing to configure. With an explicit `--database` or `--path`, the commands behave exactly as Laravel's. A package that replaces these same commands would overlap with this, which is rare; the one registered last is used. |
+| Failed jobs and job batches are stored per module, with the `database` drivers | `registerQueueDatabases()` | They go to the database of the module owning the job. Other drivers (Horizon, `file`, DynamoDB) are untouched. |
+| The `database` cache, queue and session drivers stay on the application's connection | `register()` | Laravel leaves their `connection` empty, meaning "the default one". Since the default is the current module's, their tables would be looked for in a module's database. The package fills an empty value with the application's connection, so cache, jobs and sessions stay in one place. A value you set yourself is kept. |
 | `DeferredCallbackCollection`, the Concurrency `process` driver, Octane's `DispatchesTasks` | `carryTheModuleIntoDeferredWork()` | Work started in a module keeps its module. A package rebinding one of them removes that, for its own work. |
 | Module providers register on `booting`, after every package provider | `registerLocalModuleProviders()` | A module can override what a package binds. |
 | `Factory::guessFactoryNamesUsing()` and `guessModelNamesUsing()` | `Support\ModuleFactories::register()` | A module model finds its factory in the module; any other class keeps Laravel's rule. A package or an application that sets its own resolver replaces this one, and can delegate to `ModuleFactories`. |
@@ -172,16 +187,18 @@ under one cache key, such as spatie/laravel-permission: keep it in one module.
 
 | | nwidart/laravel-modules | Spring Modulith | laravel-modulith |
 |---|---|---|---|
-| Goal | organise code in modules | module boundaries and events | organise code in modules and deploy them separately |
+| Built for | organising code in modules | module boundaries and events inside one application | distributed modules: one codebase, deployed together or apart |
 | Data | one shared database | one datasource | one database per module |
 | Between modules | direct calls | events and outbox | event stream with an ordered outbox, and RPC |
 | Moving a module to its own service | rewrite | new application | `MODULITH_RUNS` |
+| The image of one module | the whole codebase | the whole application | only that module's code (`modulith:purge`) |
 
 ### Out of scope
 
 - Turning modules on or off at runtime. Which modules run is decided at boot.
-- A `composer.json` per module while modules are deployed together: there is one `vendor/` and
-  one lockfile.
+- A lockfile per module: one process loads one version of a library, so there is one `vendor/` and
+  one lockfile. A module can still declare its own dependencies, see
+  [The dependencies of a module](docs/modules.md#the-dependencies-of-a-module).
 - Orchestration (Kubernetes, proxies). That belongs to your infrastructure.
 - Enforcing a code style.
 
@@ -267,6 +284,25 @@ return ['events' => ['listen' => ['iam.user.registered' => [RecordSignup::class]
 ```bash
 php artisan modulith:events:consume --module=analytics
 ```
+
+This event is version 1. When the shape of a payload changes, the event declares a new version and
+how to read the old ones, so events already in the stream stay readable: see
+[Versioning a payload](docs/events.md#versioning-a-payload).
+
+Then check that every module could run apart:
+
+```bash
+php artisan modulith:doctor
+```
+
+```
+Boundary crossed: apps/Analytics/app/Models/Report.php: Apps\Iam\Models\User
+[iam] runs elsewhere and serves Foundation\Iam\Contracts\IamService, but modulith.modules.iam.host is not set.
+```
+
+It reports a module that imports another module's class or names its tables, an undeclared module,
+a missing connection, a missing host or RPC secret, and exits with a non-zero code if it finds
+anything. The full list is in [Checking the application](docs/modules.md#checking-the-application).
 
 ## Testing
 

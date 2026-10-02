@@ -1,8 +1,12 @@
 # Calls between modules (RPC)
 
-RPC is for reading data another module owns, when you need the answer right away. The module that
-owns the data puts the contract and an `RpcService` in its foundation, so every caller has them
-whether the module runs in the same process or not. It implements the contract in its own
+RPC is for asking another module for an answer right away: reading the data it owns, or having it
+perform an action whose result the caller needs. An action done over RPC is not part of the
+caller's transaction: if the caller fails afterwards, the action stays done. When the caller doesn't
+need the result, announce an event instead.
+
+The module that answers puts the contract and an `RpcService` in its foundation, so every caller
+has them whether the module runs in the same process or not. It implements the contract in its own
 directory:
 
 ```

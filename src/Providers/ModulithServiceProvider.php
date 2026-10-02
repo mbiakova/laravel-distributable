@@ -46,6 +46,7 @@ use Modulith\Console\Commands\PublishEvents;
 use Modulith\Console\Commands\PurgeModules;
 use Modulith\Console\Commands\RepublishEvents;
 use Modulith\Console\Commands\TrimEvents;
+use Modulith\Console\Commands\UnusedPackages;
 use Modulith\Console\Commands\WantShadows;
 use Modulith\Console\Migrations;
 use Modulith\Console\ModuleGenerators;
@@ -328,7 +329,7 @@ final class ModulithServiceProvider extends BaseServiceProvider
             Event::listen(CommandFinished::class, fn (CommandFinished $event) => $this->app->make(ModuleGenerators::class)->finished($event));
 
             $this->commands([
-                Install::class, MakeModule::class, DeleteModule::class, ListModules::class, Doctor::class, PurgeModules::class,
+                Install::class, MakeModule::class, DeleteModule::class, ListModules::class, Doctor::class, PurgeModules::class, UnusedPackages::class,
                 CacheModules::class, ClearModules::class, PublishEvents::class, RepublishEvents::class, ConsumeEvents::class,
                 TrimEvents::class, ExportEvents::class, ImportEvents::class, AnnounceShadows::class, WantShadows::class,
             ]);
