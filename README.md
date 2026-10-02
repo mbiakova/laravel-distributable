@@ -12,8 +12,14 @@ php artisan modulith:install                      # config/modulith.php, apps/, 
 php artisan modulith:make-module iam --database   # apps/Iam and foundation/Iam, declared in config/modulith.php
 ```
 
-To start a new application with three example modules instead:
-`composer create-project mk-josias/laravel-modulith-skeleton my-app`.
+[laravel-modulith-skeleton](https://github.com/mk-josias/laravel-modulith-skeleton) is the example
+implementation: an application with three modules, authentication, permissions, Docker images for
+one process or one per module, and tests of each module alone. Read it to see the package in use,
+or start from it:
+
+```bash
+composer create-project mk-josias/laravel-modulith-skeleton my-app
+```
 
 Requires PHP 8.4+ and Laravel 12 or 13. The package has no other runtime dependency.
 
@@ -31,7 +37,7 @@ The rest of the documentation is in `docs/`:
 | [Events](docs/events.md) | the envelope, versioning, transports, the outbox, consuming |
 | [Calls between modules (RPC)](docs/rpc.md) | contracts, `RpcService`, the read-through cache |
 | [Read-only copies (shadows)](docs/shadows.md) | keeping another module's rows locally |
-| [Services in other languages](docs/other-languages.md) | the Redis entry and the RPC signature, for a non-PHP service |
+| [Services in other languages](docs/other-languages.md) | how a non-PHP service emits and reads events, calls a module, answers one, and feeds a copy |
 | [Configuration](docs/configuration.md) | every key of `config/modulith.php`, the source layout |
 
 ## Why

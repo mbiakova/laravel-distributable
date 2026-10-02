@@ -64,6 +64,16 @@ it('leaves the copies of analytics to the analytics consumer, when one process r
     expect(copies()->where('id', $user->id)->value('name'))->toBe('ada');
 });
 
+it('fills a copy from the announcement alone, so a service in another language can be its source', function () {
+    $this->receive('analytics', 'modulith.shadow.changed', ['source' => 'iam_users', 'key' => 7, 'attributes' => ['name' => 'linus']]);
+
+    expect(copies()->where('id', 7)->value('name'))->toBe('linus');
+
+    $this->receive('analytics', 'modulith.shadow.changed', ['source' => 'iam_users', 'key' => 7, 'attributes' => ['name' => 'linus', 'deleted_at' => '2026-10-02 10:00:00']]);
+
+    expect(copies()->where('id', 7)->value('deleted_at'))->not->toBeNull();
+});
+
 it('refuses any write to a copy that does not come from the source', function () {
     expect((new UserShadow)->forceFill(['id' => 1, 'name' => 'forged'])->save())->toBeFalse()
         ->and(copies()->count())->toBe(0);
