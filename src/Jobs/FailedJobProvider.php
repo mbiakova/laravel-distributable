@@ -65,10 +65,18 @@ final class FailedJobProvider extends DatabaseUuidFailedJobProvider
         return false;
     }
 
-    public function flush($hours = null)
+    /**
+     * Laravel 13 added $queue: the arguments go through as given, so 12 gets only $hours.
+     *
+     * @param  int|null  $hours
+     * @param  string|null  $queue
+     */
+    public function flush($hours = null, $queue = null)
     {
+        $arguments = func_get_args();
+
         foreach ($this->connections() as $connection) {
-            $this->on($connection, fn () => parent::flush($hours));
+            $this->on($connection, fn () => parent::flush(...$arguments));
         }
     }
 
