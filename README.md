@@ -1,9 +1,22 @@
 # Laravel Modulith
 
-Laravel Modulith makes your Laravel modules microservices: each owns its database and talks to the
-others only through events and contracts. Run them as one application, or split them apart
-whenever you want, by setting `MODULITH_RUNS`. The image of a process can then be built without
-the code of the modules it doesn't run (`modulith:purge`). The code doesn't change.
+Laravel Modulith makes your Laravel modules microservices: each one owns its database, and talks to
+the others only through events and contracts. Run them as one application, or split them apart
+whenever you want. The code doesn't change.
+
+Laravel lets you declare several database connections, but leaves it to you to name the right one
+on every model and query, and nothing stops one part of the application from reaching into
+another. The package sets up what is missing:
+
+- **A database per module, with nothing to name.** Each module's models, transactions, migrations
+  and jobs use its own database, because the package switches Laravel's default connection as the
+  code moves from one module to another.
+- **Boundaries that hold.** A module that imports another module's class, or names its tables,
+  is reported by `modulith:doctor` and fails your test suite, before it is deployed.
+- **The same behaviour together or apart.** Events go through a stream and calls through a
+  contract in both setups, so moving a module to its own process is a change of `MODULITH_RUNS`.
+- **An image per module.** `modulith:purge` removes from an image the code of the modules it
+  doesn't run, and `modulith:unused-packages` the Composer packages only they required.
 
 ```bash
 composer require mk-josias/laravel-modulith
@@ -41,24 +54,21 @@ The rest of the documentation is in `docs/`:
 
 ## Why
 
-Microservices give each part of a system its own data and its own deployment. That has a price
-from the first day, paid per service: servers, databases, pipelines, and the work of running them.
-What it buys is often less than it seems:
+Microservices exist for good reasons: a team ships its service without waiting for the others, a
+failure stays inside one service, and the part under load scales alone.
 
-- **Scaling.** Only the part under load needs to scale. Making every part a service from the
-  start doesn't follow from that.
-- **Infrastructure.** Services that end up in the same stack, run by the same team, cost more to
-  operate than one process and gain nothing from being apart.
-- **Isolation.** Splitting the code across services rarely protects it: on most projects the same
-  people have access to every repository.
+Each of those is bought with a distributed system: calls that fail over the network, data that no
+longer changes in one transaction, contracts to version, and a pipeline, a database and monitoring
+per service. That price is due on the first day. The benefits come later, with several teams or
+with a load one service can't share with the rest.
 
-What is hard to add later is the separation itself: each part owning its data and talking to the
-others through contracts. Where each part runs is easy to change, once that separation exists.
+Splitting early also means drawing the boundaries before the domain is understood, and a boundary
+drawn wrong between services is far harder to move than one inside a codebase. The usual result is
+a distributed monolith: services that still have to change and be deployed together.
 
-So with this package you write each module as if it were a separate service: it owns its
-database, shares no tables and never calls another module's classes. Where the modules run is
-decided by the environment. Modules that have no reason to be apart stay together in one process,
-and you move out only the one whose load justifies it:
+What is hard to add later is not the deployment. It is the separation: each part owning its data
+and talking to the others only through contracts. So this package has you build that separation
+from the first line of code, and leaves where each module runs to a setting:
 
 ```dotenv
 # at first, every module in one process
@@ -71,9 +81,8 @@ MODULITH_RUNS=iam,analytics       # process B
 
 Because a module already owns its data and only talks through events and contracts, moving it to
 its own process doesn't require a rewrite. Events go through a stream in both setups, so they
-behave the same whether two modules share a process or not. The image of a process can leave out
-the source code of the modules it doesn't run (`modulith:purge`), and `modulith:doctor` reports
-what would stop a module from running apart, such as one module importing another's class.
+behave the same whether two modules share a process or not. Modules with no reason to be apart
+stay together, and you move out only the one whose team or load justifies it.
 
 ## How it works
 
