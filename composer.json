@@ -1,6 +1,6 @@
 {
     "name": "mk-josias/laravel-modulith",
-    "description": "Laravel modules built as microservices: one database each, events and RPC between them. Run them as one app, or split them apart whenever you want.",
+    "description": "Laravel modules built as independently deployable microservices: each owns its data, and they talk through events and RPC. Run them as one app, or split them apart whenever you want.",
     "license": "MIT",
     "type": "library",
     "keywords": [

@@ -1,16 +1,17 @@
 # Laravel Modulith
 
-Laravel Modulith makes your Laravel modules microservices: each one owns its database, and talks to
-the others only through events and contracts. Run them as one application, or split them apart
-whenever you want. The code doesn't change.
+Laravel Modulith makes your Laravel modules independently deployable microservices: each one owns
+its data, on its own connection, and talks to the others only through events and contracts. Run
+them as one application, or split them apart whenever you want. The code doesn't change.
 
 Laravel lets you declare several database connections, but leaves it to you to name the right one
 on every model and query, and nothing stops one part of the application from reaching into
 another. The package sets up what is missing:
 
-- **A database per module, with nothing to name.** Each module's models, transactions, migrations
-  and jobs use its own database, because the package switches Laravel's default connection as the
-  code moves from one module to another.
+- **Its own data, with nothing to name.** A module can have its own connection (a database, a
+  schema, or a server of its own); its models, transactions, migrations and jobs then use it,
+  because the package switches Laravel's default connection as the code moves from one module to
+  another.
 - **Boundaries that hold.** A module that imports another module's class, or names its tables,
   is reported by `modulith:doctor` and fails your test suite, before it is deployed.
 - **The same behaviour together or apart.** Events go through a stream and calls through a
@@ -45,7 +46,7 @@ The rest of the documentation is in `docs/`:
 | | |
 |---|---|
 | [Modules](docs/modules.md) | declaring a module, generating code in it, conventions, `modulith:doctor` |
-| [A database per module](docs/databases.md) | connections, the module context, migrations, queued jobs |
+| [Each module's data](docs/databases.md) | connections, the module context, migrations, queued jobs |
 | [Events](docs/events.md) | the envelope, versioning, transports, the outbox, consuming |
 | [Calls between modules (RPC)](docs/rpc.md) | contracts, `RpcService`, the read-through cache |
 | [Read-only copies (shadows)](docs/shadows.md) | keeping another module's rows locally |
@@ -91,7 +92,7 @@ or moving one out is not a rewrite.
                               one codebase
 ┌──────────────────────────────────────────────────────────────────────┐
 │ apps/Iam              apps/Analytics            apps/Transactions    │
-│  own database          own database              own database        │
+│  own data              own data                  own data            │
 └──────────────────────────────────────────────────────────────────────┘
           │ MODULITH_RUNS picks which modules each process boots
           ▼
@@ -130,7 +131,7 @@ contracts are bound.
 
 ### The module context
 
-Several modules can share a process, each with its own database, and their code is plain Laravel:
+Several modules can share a process, each on its own connection, and their code is plain Laravel:
 `User::query()`, `DB::transaction()`, no connection named anywhere. What makes this work is the
 module context: before any module's code runs, the package makes that module's connection
 Laravel's default one, and puts the previous one back afterwards.
@@ -166,7 +167,7 @@ while it shares a process with the others.
 
 | A microservice | How the package holds a module to it |
 |---|---|
-| owns its data | its own database and connections; naming another module's tables or connection is reported |
+| owns its data | its own connection; naming another module's tables or connection is reported |
 | exposes only a contract | another module's classes can't be loaded where that module doesn't run, and importing them is reported |
 | talks through messages | events on a stream, or signed RPC calls on a contract, whether the modules share a process or not |
 | is deployed on its own | `MODULITH_RUNS` picks the modules a process runs; `modulith:purge` removes the others' code from its image |
@@ -244,7 +245,7 @@ under one cache key, such as spatie/laravel-permission: keep it in one module.
 | | nwidart/laravel-modules | Spring Modulith | laravel-modulith |
 |---|---|---|---|
 | Built for | organising code in modules | module boundaries and events inside one application | modules that are microservices: one codebase, deployed together or apart |
-| Data | one shared database | one datasource | one database per module |
+| Data | one shared database | one datasource | each module owns its data, on its own connection |
 | Between modules | direct calls | events and outbox | event stream with an ordered outbox, and RPC |
 | Moving a module to its own service | rewrite | new application | `MODULITH_RUNS` |
 | The image of one module | the whole codebase | the whole application | only that module's code (`modulith:purge`) |

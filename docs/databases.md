@@ -1,4 +1,4 @@
-# A database per module
+# Each module's data
 
 ## Connections
 
