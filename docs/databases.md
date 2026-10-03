@@ -85,7 +85,7 @@ app(\Foundation\Iam\Contracts\IamService::class)->findUser($id);   // never Apps
 `Services\Modules\ModuleContext::current()` returns the current module (`Data\Module`) or null,
 and `within($module, $callback)` runs a callback in a module's context.
 
-In tests, use `Modulith\Testing\InteractsWithModules`:
+In tests, use `Distributable\Testing\InteractsWithModules`:
 
 ```php
 $user = $this->inModule('iam', fn () => User::query()->create(['name' => 'ada']));   // iam database

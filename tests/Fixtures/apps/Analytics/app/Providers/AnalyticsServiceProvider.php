@@ -4,6 +4,6 @@ declare(strict_types=1);
 
 namespace Apps\Analytics\Providers;
 
-use Modulith\Providers\ModuleServiceProvider;
+use Distributable\Providers\ModuleServiceProvider;
 
 final class AnalyticsServiceProvider extends ModuleServiceProvider {}

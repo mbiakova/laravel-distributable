@@ -2,6 +2,6 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Tests\Support;
+namespace Distributable\Tests\Support;
 
 final class SomethingCommitted {}

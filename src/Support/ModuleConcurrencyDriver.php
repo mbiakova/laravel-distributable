@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Support;
+namespace Distributable\Support;
 
 use Carbon\CarbonInterval;
 use Closure;
+use Distributable\Services\Modules\ModuleContext;
 use Illuminate\Contracts\Concurrency\Driver;
 use Illuminate\Support\Defer\DeferredCallback;
-use Modulith\Services\Modules\ModuleContext;
 
 /** Concurrency::run() starts child processes that receive only the closure: each task is given its module. */
 final readonly class ModuleConcurrencyDriver implements Driver

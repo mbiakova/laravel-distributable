@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Console\Migrations;
+namespace Distributable\Console\Migrations;
 
 use Illuminate\Database\Console\Migrations\RefreshCommand as Base;
 

@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Console;
+namespace Distributable\Console;
 
+use Distributable\Data\Module;
+use Distributable\Services\Modules\ModuleContext;
 use Illuminate\Database\Console\Seeds\SeedCommand;
-use Modulith\Data\Module;
-use Modulith\Services\Modules\ModuleContext;
 
 /** db:seed in a module (--module, or a migrate run of that module) runs the module's own seeders, from {module}/database/seeders. */
 final class ModuleSeedCommand extends SeedCommand

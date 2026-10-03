@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Services\Modules;
+namespace Distributable\Services\Modules;
 
+use Distributable\Data\Module;
+use Distributable\Exceptions\ModuleException;
 use Illuminate\Support\Str;
-use Modulith\Data\Module;
-use Modulith\Exceptions\ModuleException;
 
 /**
- * The process-level view of the modules: every module modulith.modules declares, and the ones
- * this process loads (MODULITH_RUNS). Being loaded is a fact about the process, never about a module.
+ * The process-level view of the modules: every module distributable.modules declares, and the ones
+ * this process loads (RUN_MODULES). Being loaded is a fact about the process, never about a module.
  */
 final class ModuleRegistry
 {

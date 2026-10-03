@@ -5,6 +5,10 @@ declare(strict_types=1);
 use Apps\Iam\Events\UserAudited;
 use Apps\Iam\Events\UserRegistered;
 use Apps\Iam\Support\Recorder;
+use Distributable\Tests\Support\ExplodingTransport;
+use Distributable\Tests\Support\ModuleAppTestCase;
+use Distributable\Tests\Support\RecordingTransport;
+use Distributable\Tests\Support\TrackingTransport;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
@@ -15,10 +19,6 @@ use Microservices\Exceptions\ConfigurationException;
 use Microservices\Providers\MicroservicesServiceProvider;
 use Microservices\Services\Stream\Outbox\Relay;
 use Microservices\Services\Stream\TransportManager;
-use Modulith\Tests\Support\ExplodingTransport;
-use Modulith\Tests\Support\ModuleAppTestCase;
-use Modulith\Tests\Support\RecordingTransport;
-use Modulith\Tests\Support\TrackingTransport;
 
 uses(ModuleAppTestCase::class);
 
@@ -157,7 +157,7 @@ it('requeues published rows to rebuild an emptied stream', function () {
 });
 
 it('exports only the rows matching a property of the payload', function () {
-    $path = tempnam(sys_get_temp_dir(), 'modulith-export-');
+    $path = tempnam(sys_get_temp_dir(), 'distributable-export-');
 
     $this->app->make(Bus::class)->emit(new UserRegistered(1, 'keep'));
     $this->app->make(Bus::class)->emit(new UserRegistered(2, 'leave'));
@@ -174,7 +174,7 @@ it('exports only the rows matching a property of the payload', function () {
 });
 
 it('exports only what every consumer acknowledged, stopping at the first row not yet read', function () {
-    $path = tempnam(sys_get_temp_dir(), 'modulith-export-');
+    $path = tempnam(sys_get_temp_dir(), 'distributable-export-');
     $tracking = new TrackingTransport;
     $this->app->make(TransportManager::class)->extend('tracking', fn (): Transport => $tracking);
     Config::set('microservices.events.streams.default.driver', 'tracking');
@@ -199,11 +199,11 @@ it('refuses --acknowledged on a transport that does not know who read what', fun
     $this->app->make(Bus::class)->emit(new UserRegistered(1, 'a'));
     $this->artisan('microservices:events:publish --once --module=iam')->assertSuccessful();
 
-    $this->artisan('microservices:events:export '.sys_get_temp_dir().'/modulith-refused.jsonl --module=iam --acknowledged');
+    $this->artisan('microservices:events:export '.sys_get_temp_dir().'/distributable-refused.jsonl --module=iam --acknowledged');
 })->throws(ConfigurationException::class, 'does not know who acknowledged what');
 
 it('moves published rows to a file, in batches, and replays them from it', function () {
-    $path = tempnam(sys_get_temp_dir(), 'modulith-export-');
+    $path = tempnam(sys_get_temp_dir(), 'distributable-export-');
 
     foreach ([1, 2, 3] as $id) {
         $this->app->make(Bus::class)->emit(new UserRegistered($id, "user-{$id}"));

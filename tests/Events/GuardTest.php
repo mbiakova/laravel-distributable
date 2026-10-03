@@ -5,12 +5,12 @@ declare(strict_types=1);
 use Apps\Iam\Events\UserRegistered;
 use Apps\Iam\Handlers\OnUserRegistered;
 use Apps\Iam\Support\Recorder;
+use Distributable\Tests\Support\ModuleAppTestCase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Microservices\Data\Envelope;
 use Microservices\Providers\MicroservicesServiceProvider;
 use Microservices\Services\Stream\Dispatcher;
-use Modulith\Tests\Support\ModuleAppTestCase;
 
 uses(ModuleAppTestCase::class);
 

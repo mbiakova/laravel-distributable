@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 use Apps\Analytics\Models\UserShadow;
 use Apps\Iam\Models\User;
+use Distributable\Tests\Support\ModuleAppTestCase;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Modulith\Tests\Support\ModuleAppTestCase;
 
 uses(ModuleAppTestCase::class);
 
 beforeEach(function () {
     // One file per module, shared by its runtime and owner connections, as in production.
     foreach (['iam', 'analytics'] as $module) {
-        $file = tempnam(sys_get_temp_dir(), "modulith-{$module}-");
+        $file = tempnam(sys_get_temp_dir(), "distributable-{$module}-");
 
         foreach ([$module, "{$module}_owner"] as $connection) {
             config()->set("database.connections.{$connection}.database", $file);

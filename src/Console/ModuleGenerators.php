@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Console;
+namespace Distributable\Console;
 
 use Closure;
+use Distributable\Data\Module;
+use Distributable\Services\Modules\ModuleRegistry;
 use Illuminate\Console\Events\CommandFinished;
 use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Foundation\Application;
-use Modulith\Data\Module;
-use Modulith\Services\Modules\ModuleRegistry;
 use Symfony\Component\Finder\Finder;
 
 /** With --module, what a Laravel make:* command generates lands in that module, under its namespace. */

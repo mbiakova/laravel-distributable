@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Jobs;
+namespace Distributable\Jobs;
 
 use DateTimeInterface;
+use Distributable\Services\Modules\ModuleRegistry;
 use Illuminate\Bus\Batch;
 use Illuminate\Bus\BatchFactory;
 use Illuminate\Bus\DatabaseBatchRepository;
 use Illuminate\Bus\PendingBatch;
 use Illuminate\Database\DatabaseManager;
-use Modulith\Services\Modules\ModuleRegistry;
 
 /**
  * Stores a batch in the database of the module owning its jobs — a batch belongs to one module.

@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Services\Modules;
+namespace Distributable\Services\Modules;
 
 use Microservices\Contracts\Colocation;
 use Microservices\Models\ShadowModel;
 use Microservices\Services\Shadows\ShadowRegistry;
 
-/** The copies and sources of each module, read from modulith:cache when it ran, scanned otherwise. */
+/** The copies and sources of each module, read from distributable:cache when it ran, scanned otherwise. */
 final class CachedShadowRegistry extends ShadowRegistry
 {
     public function __construct(Colocation $colocation, private readonly DiscoveryCache $cache)

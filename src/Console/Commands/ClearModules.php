@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Console\Commands;
+namespace Distributable\Console\Commands;
 
+use Distributable\Services\Modules\DiscoveryCache;
 use Illuminate\Console\Command;
-use Modulith\Services\Modules\DiscoveryCache;
 
 final class ClearModules extends Command
 {
-    protected $signature = 'modulith:clear';
+    protected $signature = 'distributable:clear';
 
     protected $description = 'Remove the modules cache file.';
 

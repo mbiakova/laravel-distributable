@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
+use Distributable\Tests\Support\ModuleAppTestCase;
 use Illuminate\Support\Facades\Blade;
-use Modulith\Tests\Support\ModuleAppTestCase;
 
 uses(ModuleAppTestCase::class);
 

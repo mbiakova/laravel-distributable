@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use Distributable\Services\Modules\ModuleRegistry;
+use Distributable\Tests\Support\ModuleAppTestCase;
 use Foundation\Iam\Contracts\IamService;
 use Foundation\Iam\Services\IamRpcService;
 use Foundation\Iam\Services\TokenRpcService;
@@ -18,8 +20,6 @@ use Microservices\Exceptions\ServiceException;
 use Microservices\Services\Rpc\RpcSignature;
 use Microservices\Services\Rpc\RpcTransportManager;
 use Microservices\Transports\Rpc\HttpRpcTransport;
-use Modulith\Services\Modules\ModuleRegistry;
-use Modulith\Tests\Support\ModuleAppTestCase;
 
 uses(ModuleAppTestCase::class);
 
@@ -42,7 +42,7 @@ function rpcBody(string $contract, array $arguments = []): array
 /** iam runs in another process from here on: its calls leave through its host. */
 function iamRunsElsewhere(): void
 {
-    config()->set('modulith.runs', 'analytics');
+    config()->set('distributable.runs', 'analytics');
     app()->forgetInstance(ModuleRegistry::class);
     app()->forgetInstance(RpcTransportManager::class);
 }

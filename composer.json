@@ -1,12 +1,12 @@
 {
-    "name": "mk-josias/laravel-modulith",
+    "name": "mk-josias/laravel-distributable",
     "description": "Laravel modules built as independently deployable microservices: each owns its data, and they talk through events and RPC. Run them as one app, or split them apart whenever you want.",
     "license": "MIT",
     "type": "library",
     "keywords": [
         "laravel",
         "modular-monolith",
-        "modulith",
+        "distributable",
         "modules",
         "microservices",
         "events",
@@ -47,18 +47,18 @@
     },
     "autoload": {
         "psr-4": {
-            "Modulith\\": "src/"
+            "Distributable\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Modulith\\Tests\\": "tests/"
+            "Distributable\\Tests\\": "tests/"
         }
     },
     "extra": {
         "laravel": {
             "providers": [
-                "Modulith\\Providers\\ModulithServiceProvider"
+                "Distributable\\Providers\\DistributableServiceProvider"
             ]
         }
     },

@@ -37,5 +37,5 @@ php artisan microservices:events:publish                      # every local modu
 Run one consumer per module: two would break the order it reads in. Run one publisher per module
 set: two would publish an outbox out of order.
 
-In a test, `Modulith\Testing\InteractsWithModules::receive('analytics', 'iam.user.registered', [...])`
+In a test, `Distributable\Testing\InteractsWithModules::receive('analytics', 'iam.user.registered', [...])`
 hands the event to analytics' handlers, in analytics' context, without the stream or iam.

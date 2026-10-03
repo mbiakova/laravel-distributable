@@ -2,48 +2,48 @@
 
 declare(strict_types=1);
 
+use Distributable\Data\Module;
+use Distributable\Services\Modules\ComposerAutoload;
+use Distributable\Services\Modules\ModuleRegistry;
+use Distributable\Tests\Support\ModuleAppTestCase;
 use Illuminate\Support\Facades\File;
-use Modulith\Data\Module;
-use Modulith\Services\Modules\ComposerAutoload;
-use Modulith\Services\Modules\ModuleRegistry;
-use Modulith\Tests\Support\ModuleAppTestCase;
 
 uses(ModuleAppTestCase::class);
 
 it('installs the config, the modules directory and the foundation provider, then a module declares itself in that config', function () {
-    $root = sys_get_temp_dir().'/modulith-install-'.uniqid();
+    $root = sys_get_temp_dir().'/distributable-install-'.uniqid();
     File::ensureDirectoryExists($root.'/config');
     $this->app->useConfigPath($root.'/config');
-    config()->set('modulith.paths.modules', $root.'/apps');
-    config()->set('modulith.paths.foundation', $root.'/foundation');
+    config()->set('distributable.paths.modules', $root.'/apps');
+    config()->set('distributable.paths.foundation', $root.'/foundation');
 
     try {
-        $this->artisan('modulith:install')->assertSuccessful();
+        $this->artisan('distributable:install')->assertSuccessful();
 
-        expect(is_file($root.'/config/modulith.php'))->toBeTrue()
+        expect(is_file($root.'/config/distributable.php'))->toBeTrue()
             ->and(is_dir($root.'/apps'))->toBeTrue()
             ->and(file_get_contents($root.'/foundation/FoundationServiceProvider.php'))
             ->toContain('namespace Foundation;')
             ->toContain('final class FoundationServiceProvider extends BaseServiceProvider');
 
-        $this->artisan('modulith:make-module billing')->assertSuccessful();
+        $this->artisan('distributable:make-module billing')->assertSuccessful();
 
-        expect((require $root.'/config/modulith.php')['modules'])->toHaveKey('billing');
+        expect((require $root.'/config/distributable.php')['modules'])->toHaveKey('billing');
     } finally {
         File::deleteDirectory($root);
     }
 });
 
 it('creates a module, its provider and its foundation directory, and declares it', function () {
-    $root = sys_get_temp_dir().'/modulith-make-'.uniqid();
+    $root = sys_get_temp_dir().'/distributable-make-'.uniqid();
     File::ensureDirectoryExists($root.'/config');
-    File::copy(dirname(__DIR__, 2).'/config/modulith.php', $root.'/config/modulith.php');
+    File::copy(dirname(__DIR__, 2).'/config/distributable.php', $root.'/config/distributable.php');
     $this->app->useConfigPath($root.'/config');
-    config()->set('modulith.paths.modules', $root.'/apps');
-    config()->set('modulith.paths.foundation', $root.'/foundation');
+    config()->set('distributable.paths.modules', $root.'/apps');
+    config()->set('distributable.paths.foundation', $root.'/foundation');
 
     try {
-        $this->artisan('modulith:make-module point_of_sale --database')->assertSuccessful();
+        $this->artisan('distributable:make-module point_of_sale --database')->assertSuccessful();
 
         expect(file_get_contents($root.'/apps/PointOfSale/app/Providers/PointOfSaleServiceProvider.php'))
             ->toContain('namespace Apps\PointOfSale\Providers;')
@@ -51,26 +51,26 @@ it('creates a module, its provider and its foundation directory, and declares it
             ->and(is_file($root.'/apps/PointOfSale/routes/api.php'))->toBeTrue()
             ->and(file_get_contents($root.'/apps/PointOfSale/config/database.php'))->toContain("'point_of_sale_owner'")
             ->and(is_dir($root.'/foundation/PointOfSale/Contracts'))->toBeTrue()
-            ->and((require $root.'/config/modulith.php')['modules'])->toBe(['point_of_sale' => []]);
+            ->and((require $root.'/config/distributable.php')['modules'])->toBe(['point_of_sale' => []]);
 
-        $this->artisan('modulith:make-module point_of_sale')->assertFailed();
+        $this->artisan('distributable:make-module point_of_sale')->assertFailed();
     } finally {
         File::deleteDirectory($root);
     }
 });
 
 it('adds the module and the foundation to composer.json for the tools that read it, and tells an entry gone stale', function () {
-    $root = sys_get_temp_dir().'/modulith-composer-'.uniqid();
+    $root = sys_get_temp_dir().'/distributable-composer-'.uniqid();
     File::ensureDirectoryExists($root.'/config');
-    File::copy(dirname(__DIR__, 2).'/config/modulith.php', $root.'/config/modulith.php');
+    File::copy(dirname(__DIR__, 2).'/config/distributable.php', $root.'/config/distributable.php');
     File::put($root.'/composer.json', '{"autoload": {"psr-4": {"App\\\\": "app/"}}, "extra": {}}');
     $this->app->setBasePath($root);
     $this->app->useConfigPath($root.'/config');
-    config()->set('modulith.paths.modules', 'apps');
-    config()->set('modulith.paths.foundation', 'foundation');
+    config()->set('distributable.paths.modules', 'apps');
+    config()->set('distributable.paths.foundation', 'foundation');
 
     try {
-        $this->artisan('modulith:make-module billing')->expectsOutputToContain('Added to composer.json')->assertSuccessful();
+        $this->artisan('distributable:make-module billing')->expectsOutputToContain('Added to composer.json')->assertSuccessful();
 
         $composer = json_decode((string) file_get_contents($root.'/composer.json'), true);
 
@@ -94,29 +94,29 @@ it('adds the module and the foundation to composer.json for the tools that read 
 });
 
 it('deletes a module: its folder, its foundation folder, its declaration and its composer.json entries', function () {
-    $root = sys_get_temp_dir().'/modulith-delete-'.uniqid();
+    $root = sys_get_temp_dir().'/distributable-delete-'.uniqid();
     File::ensureDirectoryExists($root.'/config');
-    File::copy(dirname(__DIR__, 2).'/config/modulith.php', $root.'/config/modulith.php');
+    File::copy(dirname(__DIR__, 2).'/config/distributable.php', $root.'/config/distributable.php');
     File::put($root.'/composer.json', '{"autoload": {"psr-4": {"App\\\\": "app/"}}}');
     $this->app->setBasePath($root);
     $this->app->useConfigPath($root.'/config');
-    config()->set('modulith.paths.modules', 'apps');
-    config()->set('modulith.paths.foundation', 'foundation');
+    config()->set('distributable.paths.modules', 'apps');
+    config()->set('distributable.paths.foundation', 'foundation');
 
     try {
-        $this->artisan('modulith:make-module billing')->assertSuccessful();
-        $this->artisan('modulith:make-module shipping')->assertSuccessful();
-        config()->set('modulith.modules', ['billing' => [], 'shipping' => []]);
+        $this->artisan('distributable:make-module billing')->assertSuccessful();
+        $this->artisan('distributable:make-module shipping')->assertSuccessful();
+        config()->set('distributable.modules', ['billing' => [], 'shipping' => []]);
         $this->app->forgetInstance(ModuleRegistry::class);
 
-        $this->artisan('modulith:delete-module billing --force')->assertSuccessful();
+        $this->artisan('distributable:delete-module billing --force')->assertSuccessful();
 
         $composer = json_decode((string) file_get_contents($root.'/composer.json'), true);
 
         expect(is_dir($root.'/apps/Billing'))->toBeFalse()
             ->and(is_dir($root.'/foundation/Billing'))->toBeFalse()
             ->and(is_dir($root.'/apps/Shipping'))->toBeTrue()
-            ->and((require $root.'/config/modulith.php')['modules'])->toBe(['shipping' => []])
+            ->and((require $root.'/config/distributable.php')['modules'])->toBe(['shipping' => []])
             ->and(array_keys($composer['autoload']['psr-4']))->toBe([
                 'App\\', 'Foundation\\', 'Apps\\Shipping\\', 'Apps\\Shipping\\Database\\Factories\\', 'Apps\\Shipping\\Database\\Seeders\\',
             ])
@@ -127,9 +127,9 @@ it('deletes a module: its folder, its foundation folder, its declaration and its
 });
 
 it('lists every module and where it runs', function () {
-    config()->set('modulith.modules.iam', []);
+    config()->set('distributable.modules.iam', []);
 
-    $this->artisan('modulith:list')
+    $this->artisan('distributable:list')
         ->expectsTable(['Module', 'Namespace', 'Runs here', 'Database', 'Remote host'], [
             ['analytics', 'Apps\Analytics', 'yes', 'analytics', '—'],
             ['gateway', 'Apps\Gateway', 'yes', '—', '—'],
@@ -139,27 +139,27 @@ it('lists every module and where it runs', function () {
 });
 
 it('fails on a module whose provider does not exist, and names it', function () {
-    config()->set('modulith.modules.ghost', []);
+    config()->set('distributable.modules.ghost', []);
     $this->app->forgetInstance(ModuleRegistry::class);
 
-    $this->artisan('modulith:doctor')
+    $this->artisan('distributable:doctor')
         ->expectsOutputToContain('[ghost] provider Apps\Ghost\Providers\GhostServiceProvider does not exist.')
         ->assertFailed();
 });
 
-it('fails on a module folder that modulith.modules does not declare', function () {
-    config()->set('modulith.modules', ['analytics' => [], 'iam' => []]);
+it('fails on a module folder that distributable.modules does not declare', function () {
+    config()->set('distributable.modules', ['analytics' => [], 'iam' => []]);
     $this->app->forgetInstance(ModuleRegistry::class);
 
-    $this->artisan('modulith:doctor')
-        ->expectsOutputToContain('/Gateway] is not declared in modulith.modules.')
+    $this->artisan('distributable:doctor')
+        ->expectsOutputToContain('/Gateway] is not declared in distributable.modules.')
         ->assertFailed();
 });
 
 it('fails when modules serve RPC contracts and no secret signs the calls', function () {
     config()->set('microservices.rpc.secret', '');
 
-    $this->artisan('modulith:doctor')
+    $this->artisan('distributable:doctor')
         ->expectsOutputToContain('microservices.rpc.secret is empty')
         ->assertFailed();
 });
@@ -169,7 +169,7 @@ it('fails on two modules setting one config key to different values, and leaves 
     file_put_contents($file, "<?php\n\nreturn ['flag' => false, 'items' => ['from-analytics'], 'nested' => ['override' => 'module']];\n");
 
     try {
-        $this->artisan('modulith:doctor')
+        $this->artisan('distributable:doctor')
             ->expectsOutputToContain('Modules [analytics, iam] set config [iam.flag] to different values')
             ->doesntExpectOutputToContain('[iam.items')
             ->doesntExpectOutputToContain('[iam.nested.override]')
@@ -180,5 +180,5 @@ it('fails on two modules setting one config key to different values, and leaves 
 });
 
 it('passes once every module can run', function () {
-    $this->artisan('modulith:doctor')->expectsOutputToContain('Every module can run.')->assertSuccessful();
+    $this->artisan('distributable:doctor')->expectsOutputToContain('Every module can run.')->assertSuccessful();
 });

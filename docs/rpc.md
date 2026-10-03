@@ -18,7 +18,7 @@ apps/Iam/app/Providers/IamServiceProvider    declares that implementation in $se
 
 ```php
 // foundation/FoundationServiceProvider.php
-final class FoundationServiceProvider extends \Modulith\Providers\FoundationServiceProvider
+final class FoundationServiceProvider extends \Distributable\Providers\FoundationServiceProvider
 {
     protected array $rpc = [
         IamService::class => IamRpcService::class,
@@ -26,7 +26,7 @@ final class FoundationServiceProvider extends \Modulith\Providers\FoundationServ
 }
 
 // apps/Iam/app/Providers/IamServiceProvider.php
-final class IamServiceProvider extends \Modulith\Providers\ModuleServiceProvider
+final class IamServiceProvider extends \Distributable\Providers\ModuleServiceProvider
 {
     protected array $services = [
         \Foundation\Iam\Contracts\IamService::class => \Apps\Iam\Services\IamService::class,
@@ -56,7 +56,7 @@ modules type-hint `Foundation\Iam\Contracts\IamService` and don't need to know w
 ```
 analytics ─► IamService (the contract) ─► IamRpcService::call('findUser', ['id' => 1])
                                                     │
-                                 does iam run in this process (MODULITH_RUNS)?
+                                 does iam run in this process (RUN_MODULES)?
            ┌────────────────────────────────────────┴───────────────────────────────────────┐
            │ yes: a direct method call                                                      │ no: POST {iam's host}/iam/rpc/findUser, signed
            ▼                                                                                ▼
@@ -70,6 +70,6 @@ the implementation runs in iam's [context](../README.md#the-module-context), so 
 switch to its own database.
 
 The module writes no route: the package serves `POST {module}/rpc/{method}` for every module the
-process runs. A module's host comes from `modulith.modules`; the secret, the cache store and the
+process runs. A module's host comes from `distributable.modules`; the secret, the cache store and the
 transports are in `config/microservices.php`. A contract with no `RpcService` stays bound to the
 module's implementation, and works only in a process that runs that module.

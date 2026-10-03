@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Console\Commands;
+namespace Distributable\Console\Commands;
 
+use Distributable\Config\Modules;
+use Distributable\Data\Module;
+use Distributable\Services\Modules\ComposerAutoload;
 use Illuminate\Console\Command;
-use Modulith\Config\Modules;
-use Modulith\Data\Module;
-use Modulith\Services\Modules\ComposerAutoload;
 
 final class MakeModule extends Command
 {
-    protected $signature = 'modulith:make-module
+    protected $signature = 'distributable:make-module
         {name : The module name, snake_case (e.g. point_of_sale)}
         {--database : Give the module its own database connections}';
 
@@ -37,7 +37,7 @@ final class MakeModule extends Command
 
                 namespace {$module->namespace}\\Providers;
 
-                use Modulith\\Providers\\ModuleServiceProvider;
+                use Distributable\\Providers\\ModuleServiceProvider;
 
                 final class {$providerClass} extends ModuleServiceProvider {}
 
@@ -78,18 +78,18 @@ final class MakeModule extends Command
 
     private function declare(Module $module): void
     {
-        $config = config_path('modulith.php');
+        $config = config_path('distributable.php');
         $contents = is_file($config) ? (string) file_get_contents($config) : '';
         $declared = preg_replace("/('modules'\s*=>\s*\[)/", "$1\n        '{$module->name}' => [],", $contents, 1, $count);
 
         if ($count === 1 && is_string($declared)) {
             file_put_contents($config, $declared);
-            $this->components->info('Declared in config/modulith.php.');
+            $this->components->info('Declared in config/distributable.php.');
 
             return;
         }
 
-        $this->components->warn("Declare it in config/modulith.php: 'modules' => ['{$module->name}' => []].");
+        $this->components->warn("Declare it in config/distributable.php: 'modules' => ['{$module->name}' => []].");
     }
 
     private function write(string $path, string $contents): void

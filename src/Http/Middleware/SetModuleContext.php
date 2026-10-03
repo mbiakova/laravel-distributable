@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Http\Middleware;
+namespace Distributable\Http\Middleware;
 
 use Closure;
+use Distributable\Services\Modules\ModuleContext;
+use Distributable\Services\Modules\ModuleRegistry;
 use Illuminate\Http\Request;
-use Modulith\Services\Modules\ModuleContext;
-use Modulith\Services\Modules\ModuleRegistry;
 use Symfony\Component\HttpFoundation\Response;
 
 /** Put on every route a module loads: the request runs in that module's context. */

@@ -3,12 +3,12 @@
 declare(strict_types=1);
 
 use Apps\Iam\Events\UserRegistered;
+use Distributable\Tests\Support\ModuleAppTestCase;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Str;
 use Microservices\Data\Envelope;
 use Microservices\Services\Stream\TransportManager;
 use Microservices\Transports\Stream\RedisStreamTransport;
-use Modulith\Tests\Support\ModuleAppTestCase;
 
 uses(ModuleAppTestCase::class);
 
@@ -20,7 +20,7 @@ beforeEach(function () {
     }
 
     config()->set('microservices.events.streams.default.driver', 'redis');
-    config()->set('microservices.events.streams.default.key', 'modulith-test:'.Str::random(8));
+    config()->set('microservices.events.streams.default.key', 'distributable-test:'.Str::random(8));
     config()->set('microservices.events.streams.default.block', 100);
 });
 

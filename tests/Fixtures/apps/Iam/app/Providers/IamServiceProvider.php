@@ -8,10 +8,10 @@ use Apps\Iam\Listeners\AfterCommitRecordEventConnection;
 use Apps\Iam\Listeners\QueuedRecordEventConnection;
 use Apps\Iam\Listeners\RecordEventConnection;
 use Apps\Iam\Services\IamService;
+use Distributable\Providers\ModuleServiceProvider;
+use Distributable\Tests\Support\SomethingCommitted;
+use Distributable\Tests\Support\SomethingHappened;
 use Foundation\Iam\Contracts\IamService as Contract;
-use Modulith\Providers\ModuleServiceProvider;
-use Modulith\Tests\Support\SomethingCommitted;
-use Modulith\Tests\Support\SomethingHappened;
 
 final class IamServiceProvider extends ModuleServiceProvider
 {

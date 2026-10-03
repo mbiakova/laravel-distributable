@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-use Modulith\Tests\TestCase;
+use Distributable\Tests\TestCase;
 
 uses(TestCase::class);
 
-use Modulith\Data\Module;
-use Modulith\Exceptions\ModuleException;
+use Distributable\Data\Module;
+use Distributable\Exceptions\ModuleException;
 
 it('derives every convention from the module name', function () {
     $module = Module::fromName('point_of_sale', 'Apps', 'apps');

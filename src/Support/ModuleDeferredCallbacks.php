@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Support;
+namespace Distributable\Support;
 
 use Closure;
+use Distributable\Services\Modules\ModuleContext;
 use Illuminate\Container\Container;
 use Illuminate\Support\Defer\DeferredCallback;
 use Illuminate\Support\Defer\DeferredCallbackCollection;
-use Modulith\Services\Modules\ModuleContext;
 
 /** defer() callbacks run after the response, once the module that deferred them has handed back: each keeps its module. */
 final class ModuleDeferredCallbacks extends DeferredCallbackCollection

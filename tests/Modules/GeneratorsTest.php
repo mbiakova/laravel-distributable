@@ -2,19 +2,19 @@
 
 declare(strict_types=1);
 
+use Distributable\Exceptions\ModuleException;
+use Distributable\Services\Modules\ModuleRegistry;
+use Distributable\Tests\Support\ModuleAppTestCase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
-use Modulith\Exceptions\ModuleException;
-use Modulith\Services\Modules\ModuleRegistry;
-use Modulith\Tests\Support\ModuleAppTestCase;
 
 uses(ModuleAppTestCase::class);
 
 beforeEach(function () {
-    $this->root = sys_get_temp_dir().'/modulith-generators-'.uniqid();
+    $this->root = sys_get_temp_dir().'/distributable-generators-'.uniqid();
     File::ensureDirectoryExists($this->root.'/apps/Billing/app/Providers');
-    config()->set('modulith.modules', ['billing' => []]);
-    config()->set('modulith.paths.modules', $this->root.'/apps');
+    config()->set('distributable.modules', ['billing' => []]);
+    config()->set('distributable.paths.modules', $this->root.'/apps');
     $this->app->forgetInstance(ModuleRegistry::class);
     $this->module = $this->root.'/apps/Billing';
 });

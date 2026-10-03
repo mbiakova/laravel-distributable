@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Console;
+namespace Distributable\Console;
 
 use Illuminate\Console\Command;
 use Illuminate\Console\GeneratorCommand;

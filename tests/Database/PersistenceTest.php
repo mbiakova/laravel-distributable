@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 use Apps\Iam\Actions\RegisterUser;
 use Apps\Iam\Models\User;
+use Distributable\Tests\Support\ModuleAppTestCase;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Modulith\Tests\Support\ModuleAppTestCase;
 
 uses(ModuleAppTestCase::class);
 

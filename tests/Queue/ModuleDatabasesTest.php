@@ -3,12 +3,12 @@
 declare(strict_types=1);
 
 use Apps\Iam\Jobs\SyncDirectory;
+use Distributable\Jobs\FailedJobProvider;
+use Distributable\Tests\Support\ModuleAppTestCase;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Modulith\Jobs\FailedJobProvider;
-use Modulith\Tests\Support\ModuleAppTestCase;
 
 uses(ModuleAppTestCase::class);
 

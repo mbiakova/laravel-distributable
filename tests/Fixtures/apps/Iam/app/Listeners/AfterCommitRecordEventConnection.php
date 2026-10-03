@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Apps\Iam\Listeners;
 
+use Distributable\Tests\Support\SomethingCommitted;
 use Illuminate\Contracts\Events\ShouldHandleEventsAfterCommit;
 use Illuminate\Support\Facades\DB;
-use Modulith\Tests\Support\SomethingCommitted;
 
 final class AfterCommitRecordEventConnection implements ShouldHandleEventsAfterCommit
 {

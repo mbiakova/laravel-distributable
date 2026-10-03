@@ -1,6 +1,6 @@
-# Laravel Modulith
+# Laravel Distributable
 
-Laravel Modulith makes your Laravel modules independently deployable microservices: each one owns
+Laravel Distributable makes your Laravel modules independently deployable microservices: each one owns
 its data, on its own connection, and talks to the others only through events and contracts. Run
 them as one application, or split them apart whenever you want. The code doesn't change.
 
@@ -13,25 +13,25 @@ another. The package sets up what is missing:
   because the package switches Laravel's default connection as the code moves from one module to
   another.
 - **Boundaries that hold.** A module that imports another module's class, or names its tables,
-  is reported by `modulith:doctor` and fails your test suite, before it is deployed.
+  is reported by `distributable:doctor` and fails your test suite, before it is deployed.
 - **The same behaviour together or apart.** Events go through a stream and calls through a
-  contract in both setups, so moving a module to its own process is a change of `MODULITH_RUNS`.
-- **An image per module.** `modulith:purge` removes from an image the code of the modules it
-  doesn't run, and `modulith:unused-packages` the Composer packages only they required.
+  contract in both setups, so moving a module to its own process is a change of `RUN_MODULES`.
+- **An image per module.** `distributable:purge` removes from an image the code of the modules it
+  doesn't run, and `distributable:unused-packages` the Composer packages only they required.
 
 ```bash
-composer require mk-josias/laravel-modulith
-php artisan modulith:install                      # config/modulith.php, apps/, foundation/FoundationServiceProvider.php
-php artisan modulith:make-module iam --database   # apps/Iam and foundation/Iam, declared in config/modulith.php
+composer require mk-josias/laravel-distributable
+php artisan distributable:install                      # config/distributable.php, apps/, foundation/FoundationServiceProvider.php
+php artisan distributable:make-module iam --database   # apps/Iam and foundation/Iam, declared in config/distributable.php
 ```
 
-[laravel-modulith-skeleton](https://github.com/mk-josias/laravel-modulith-skeleton) is the example
+[laravel-distributable-skeleton](https://github.com/mk-josias/laravel-distributable-skeleton) is the example
 implementation: an application with three modules, authentication, permissions, Docker images for
 one process or one per module, and tests of each module alone. Read it to see the package in use,
 or start from it:
 
 ```bash
-composer create-project mk-josias/laravel-modulith-skeleton my-app
+composer create-project mk-josias/laravel-distributable-skeleton my-app
 ```
 
 Requires PHP 8.4+ and Laravel 12 or 13. Events, calls and copies between modules come from
@@ -47,13 +47,13 @@ The rest of the documentation is in `docs/`:
 
 | | |
 |---|---|
-| [Modules](docs/modules.md) | declaring a module, generating code in it, conventions, `modulith:doctor` |
+| [Modules](docs/modules.md) | declaring a module, generating code in it, conventions, `distributable:doctor` |
 | [Each module's data](docs/databases.md) | connections, the module context, migrations, queued jobs |
 | [Events](docs/events.md) | what a module adds to laravel-microservices' events: its handlers, its outbox, its consumer |
 | [Calls between modules (RPC)](docs/rpc.md) | contracts and `RpcService` in the foundation, the direct call in one process |
 | [Read-only copies (shadows)](docs/shadows.md) | keeping another module's rows locally |
 | [Services in other languages](docs/other-languages.md) | a non-PHP service next to the modules |
-| [Configuration](docs/configuration.md) | every key of `config/modulith.php`, the source layout |
+| [Configuration](docs/configuration.md) | every key of `config/distributable.php`, the source layout |
 
 ## Why
 
@@ -76,11 +76,11 @@ processes they run in is a setting, chosen module by module and changed in eithe
 
 ```dotenv
 # every module in one process
-MODULITH_RUNS=*
+RUN_MODULES=*
 
 # one module alone, the others grouped
-MODULITH_RUNS=transactions        # process A
-MODULITH_RUNS=iam,analytics       # process B
+RUN_MODULES=transactions        # process A
+RUN_MODULES=iam,analytics       # process B
 ```
 
 A call between two modules of the same process is a direct method call: no HTTP, no signature,
@@ -96,7 +96,7 @@ or moving one out is not a rewrite.
 │ apps/Iam              apps/Analytics            apps/Transactions    │
 │  own data              own data                  own data            │
 └──────────────────────────────────────────────────────────────────────┘
-          │ MODULITH_RUNS picks which modules each process boots
+          │ RUN_MODULES picks which modules each process boots
           ▼
 ┌─────────────── process A ───────────────┐   ┌──── process B ────┐
 │ iam · analytics                         │   │ transactions      │
@@ -119,7 +119,7 @@ Shadows, the read-only copies described below, are built on events.
 
 When the application boots, the package:
 
-1. reads the modules declared in `config/modulith.php`, and autoloads the ones this process runs
+1. reads the modules declared in `config/distributable.php`, and autoloads the ones this process runs
    under `Apps\{Module}\`;
 2. registers the service provider of every module this process runs. The provider merges the
    module's config files, loads its routes, translations and commands, and records the
@@ -172,9 +172,9 @@ while it shares a process with the others.
 | owns its data | its own connection; naming another module's tables or connection is reported |
 | exposes only a contract | another module's classes can't be loaded where that module doesn't run, and importing them is reported |
 | talks through messages | events on a stream, or signed RPC calls on a contract, whether the modules share a process or not |
-| is deployed on its own | `MODULITH_RUNS` picks the modules a process runs; `modulith:purge` removes the others' code from its image |
+| is deployed on its own | `RUN_MODULES` picks the modules a process runs; `distributable:purge` removes the others' code from its image |
 
-`modulith:doctor` and `Boundaries` check all of this in CI, so a module that would not survive
+`distributable:doctor` and `Boundaries` check all of this in CI, so a module that would not survive
 being moved to its own service fails before it is deployed.
 
 ### What the package includes
@@ -212,7 +212,7 @@ does, so you know where a package's data ends up:
 | What the package does | Where | What it means for another package |
 |---|---|---|
 | While a module's code runs, `database.default` is that module's connection | `ModuleContext` | A package that uses the default connection (a media library, an activity log, permissions) stores its rows in the database of the module that calls it, so each module has its own. Its tables are there because its migrations run in every module database. A package that should keep one store for the whole application (Telescope, Pulse) is given the application's connection in its own config file. |
-| `migrate`, `migrate:status`, `migrate:rollback`, `migrate:reset`, `migrate:refresh` and `migrate:fresh` run once per database | `ModulithServiceProvider::registerModuleMigrations()` | A package's migrations, loaded with `loadMigrationsFrom()` or published to `database/migrations`, run in each database with nothing to configure. With an explicit `--database` or `--path`, the commands behave exactly as Laravel's. A package that replaces these same commands would overlap with this, which is rare; the one registered last is used. |
+| `migrate`, `migrate:status`, `migrate:rollback`, `migrate:reset`, `migrate:refresh` and `migrate:fresh` run once per database | `DistributableServiceProvider::registerModuleMigrations()` | A package's migrations, loaded with `loadMigrationsFrom()` or published to `database/migrations`, run in each database with nothing to configure. With an explicit `--database` or `--path`, the commands behave exactly as Laravel's. A package that replaces these same commands would overlap with this, which is rare; the one registered last is used. |
 | Failed jobs and job batches are stored per module, with the `database` drivers | `registerQueueDatabases()` | They go to the database of the module owning the job. Other drivers (Horizon, `file`, DynamoDB) are untouched. |
 | The `database` cache, queue and session drivers stay on the application's connection | `register()` | Laravel leaves their `connection` empty, meaning "the default one". Since the default is the current module's, their tables would be looked for in a module's database. The package fills an empty value with the application's connection, so cache, jobs and sessions stay in one place. A value you set yourself is kept. |
 | `DeferredCallbackCollection`, the Concurrency `process` driver, Octane's `DispatchesTasks` | `carryTheModuleIntoDeferredWork()` | Work started in a module keeps its module. A package rebinding one of them removes that, for its own work. |
@@ -247,13 +247,13 @@ under one cache key, such as spatie/laravel-permission: keep it in one module.
 
 ### Compared to other packages
 
-| | nwidart/laravel-modules | Spring Modulith | laravel-modulith |
+| | nwidart/laravel-modules | Spring Modulith | laravel-distributable |
 |---|---|---|---|
 | Built for | organising code in modules | module boundaries and events inside one application | modules that are microservices: one codebase, deployed together or apart |
 | Data | one shared database | one datasource | each module owns its data, on its own connection |
 | Between modules | direct calls | events and outbox | event stream with an ordered outbox, and RPC |
-| Moving a module to its own service | rewrite | new application | `MODULITH_RUNS` |
-| The image of one module | the whole codebase | the whole application | only that module's code (`modulith:purge`) |
+| Moving a module to its own service | rewrite | new application | `RUN_MODULES` |
+| The image of one module | the whole codebase | the whole application | only that module's code (`distributable:purge`) |
 
 ### Out of scope
 
@@ -269,7 +269,7 @@ under one cache key, such as spatie/laravel-permission: keep it in one module.
 `app/` is still your Laravel application. Each module lives in `apps/`.
 
 ```
-config/modulith.php                   declares the modules: 'modules' => ['iam' => [], …]
+config/distributable.php                   declares the modules: 'modules' => ['iam' => [], …]
 
 apps/Iam/
 ├── app/                              Apps\Iam\, laid out like a Laravel app
@@ -292,14 +292,14 @@ foundation/
 ```
 
 ```php
-// config/modulith.php
+// config/distributable.php
 'modules' => [
     'iam'       => [],
     'analytics' => [],
 ],
 
 // apps/Iam/app/Providers/IamServiceProvider.php
-final class IamServiceProvider extends \Modulith\Providers\ModuleServiceProvider {}
+final class IamServiceProvider extends \Distributable\Providers\ModuleServiceProvider {}
 
 // apps/Iam/app/Models/User.php: plain Eloquent, it uses iam's database because it runs in iam
 final class User extends \Illuminate\Database\Eloquent\Model {}
@@ -356,12 +356,12 @@ how to read the old ones, so events already in the stream stay readable: see
 Then check that every module could run apart:
 
 ```bash
-php artisan modulith:doctor
+php artisan distributable:doctor
 ```
 
 ```
 Boundary crossed: apps/Analytics/app/Models/Report.php: Apps\Iam\Models\User
-[iam] runs elsewhere and serves Foundation\Iam\Contracts\IamService, but modulith.modules.iam.host is not set.
+[iam] runs elsewhere and serves Foundation\Iam\Contracts\IamService, but distributable.modules.iam.host is not set.
 ```
 
 It reports a module that imports another module's class or names its tables, an undeclared module,

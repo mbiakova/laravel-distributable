@@ -2,18 +2,18 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Console\Commands;
+namespace Distributable\Console\Commands;
 
+use Distributable\Config\Modules;
+use Distributable\Data\Module;
+use Distributable\Services\Modules\ComposerAutoload;
+use Distributable\Services\Modules\ModuleRegistry;
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
-use Modulith\Config\Modules;
-use Modulith\Data\Module;
-use Modulith\Services\Modules\ComposerAutoload;
-use Modulith\Services\Modules\ModuleRegistry;
 
 final class DeleteModule extends Command
 {
-    protected $signature = 'modulith:delete-module
+    protected $signature = 'distributable:delete-module
         {name : The module to delete}
         {--force : Do not ask for confirmation}';
 
@@ -35,14 +35,14 @@ final class DeleteModule extends Command
         $autoload->remove($entries);
         $this->undeclare($module);
 
-        $this->components->info("Module [{$module->name}] deleted. Run modulith:doctor: other modules may still use what it shared.");
+        $this->components->info("Module [{$module->name}] deleted. Run distributable:doctor: other modules may still use what it shared.");
 
         return self::SUCCESS;
     }
 
     private function undeclare(Module $module): void
     {
-        $config = config_path('modulith.php');
+        $config = config_path('distributable.php');
         $contents = is_file($config) ? (string) file_get_contents($config) : '';
         $undeclared = preg_replace("/^[ \t]*'".preg_quote($module->name, '/')."'\s*=>\s*\[[^\]\n]*\],?[ \t]*\n/m", '', $contents, 1, $count);
 
@@ -52,6 +52,6 @@ final class DeleteModule extends Command
             return;
         }
 
-        $this->components->warn("Remove it from config/modulith.php: 'modules' => ['{$module->name}' => …].");
+        $this->components->warn("Remove it from config/distributable.php: 'modules' => ['{$module->name}' => …].");
     }
 }

@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 use Apps\Iam\Models\User;
 use Apps\Iam\Providers\IamServiceProvider;
+use Distributable\Services\Modules\ModuleRegistry;
+use Distributable\Tests\Support\ModuleAppTestCase;
 use Illuminate\Database\Migrations\Migrator;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Router;
-use Modulith\Services\Modules\ModuleRegistry;
-use Modulith\Tests\Support\ModuleAppTestCase;
 
 uses(ModuleAppTestCase::class);
 
@@ -21,7 +21,7 @@ it('builds the registry from the configured source', function () {
 
 it('answers which modules this process runs on the status route', function () {
     $this->get('/')->assertOk()->assertExactJson([
-        'message' => 'Hello from laravel-modulith',
+        'message' => 'Hello from laravel-distributable',
         'modules' => ['analytics', 'gateway', 'iam'],
         'status' => 'ok',
     ]);

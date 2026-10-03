@@ -2,18 +2,18 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Console\Commands;
+namespace Distributable\Console\Commands;
 
+use Distributable\Services\Modules\ModuleRegistry;
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
-use Modulith\Services\Modules\ModuleRegistry;
 
-/** For an image that runs only some modules: config/modulith.php still declares the others. */
+/** For an image that runs only some modules: config/distributable.php still declares the others. */
 final class PurgeModules extends Command
 {
-    protected $signature = 'modulith:purge {--force : Skip the confirmation}';
+    protected $signature = 'distributable:purge {--force : Skip the confirmation}';
 
-    protected $description = 'Delete the folder of every module this process does not run (MODULITH_RUNS).';
+    protected $description = 'Delete the folder of every module this process does not run (RUN_MODULES).';
 
     public function handle(ModuleRegistry $registry, Filesystem $files): int
     {

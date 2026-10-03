@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Traits;
+namespace Distributable\Traits;
 
-use Modulith\Data\Module;
-use Modulith\Exceptions\ModuleException;
-use Modulith\Services\Modules\ModuleRegistry;
+use Distributable\Data\Module;
+use Distributable\Exceptions\ModuleException;
+use Distributable\Services\Modules\ModuleRegistry;
 
 trait ResolvesModule
 {

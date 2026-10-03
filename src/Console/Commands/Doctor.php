@@ -2,20 +2,20 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Console\Commands;
+namespace Distributable\Console\Commands;
 
+use Distributable\Config\Modules;
+use Distributable\Services\Modules\ComposerAutoload;
+use Distributable\Services\Modules\ModuleRegistry;
+use Distributable\Testing\Boundaries;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 use Microservices\Config\Rpc;
 use Microservices\Services\Rpc\RpcServices;
-use Modulith\Config\Modules;
-use Modulith\Services\Modules\ComposerAutoload;
-use Modulith\Services\Modules\ModuleRegistry;
-use Modulith\Testing\Boundaries;
 
 final class Doctor extends Command
 {
-    protected $signature = 'modulith:doctor';
+    protected $signature = 'distributable:doctor';
 
     protected $description = 'Check that every module can run: declaration, provider, connections, remote hosts, boundaries.';
 
@@ -27,7 +27,7 @@ final class Doctor extends Command
 
         foreach (glob($root.'/*', GLOB_ONLYDIR) ?: [] as $directory) {
             if ($registry->find(Str::snake(basename($directory))) === null) {
-                $problems[] = "[{$modulesPath}/".basename($directory).'] is not declared in modulith.modules.';
+                $problems[] = "[{$modulesPath}/".basename($directory).'] is not declared in distributable.modules.';
             }
         }
 
@@ -51,7 +51,7 @@ final class Doctor extends Command
             if ($service['service'] === null) {
                 $problems[] = "{$contract} is not in the foundation of a declared module.";
             } elseif (! $registry->isLocal($service['service']) && $config->getHost($service['service']) === null) {
-                $problems[] = "[{$service['service']}] runs elsewhere and serves {$contract}, but modulith.modules.{$service['service']}.host is not set.";
+                $problems[] = "[{$service['service']}] runs elsewhere and serves {$contract}, but distributable.modules.{$service['service']}.host is not set.";
             }
         }
 

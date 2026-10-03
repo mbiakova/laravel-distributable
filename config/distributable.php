@@ -17,11 +17,11 @@ return [
     */
 
     'modules' => [
-        // 'iam' => ['host' => env('MODULITH_IAM_HOST')],
+        // 'iam' => ['host' => env('IAM_HOST')],
     ],
 
     // Modules booted by THIS process: '*' = all, or a comma-separated list.
-    'runs' => env('MODULITH_RUNS', '*'),
+    'runs' => env('RUN_MODULES', '*'),
 
     // {paths.modules}/{Module}/app is autoloaded as {namespaces.modules}\{Module}\, and
     // {paths.foundation}/{Module} as {namespaces.foundation}\{Module}\: no entry to add to composer.json.
@@ -36,6 +36,6 @@ return [
     ],
 
     // Path answering which modules this process runs (e.g. '/'), or null to register nothing.
-    'status_route' => env('MODULITH_STATUS_ROUTE'),
+    'status_route' => env('MODULES_STATUS_ROUTE'),
 
 ];

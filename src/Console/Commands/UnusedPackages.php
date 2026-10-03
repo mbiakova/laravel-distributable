@@ -2,17 +2,17 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Console\Commands;
+namespace Distributable\Console\Commands;
 
+use Distributable\Services\Modules\ModuleRegistry;
 use Illuminate\Console\Command;
-use Modulith\Services\Modules\ModuleRegistry;
 
-/** Run before modulith:purge, which deletes the files this reads: the output goes to `composer update`, which removes those packages only. */
+/** Run before distributable:purge, which deletes the files this reads: the output goes to `composer update`, which removes those packages only. */
 final class UnusedPackages extends Command
 {
-    protected $signature = 'modulith:unused-packages';
+    protected $signature = 'distributable:unused-packages';
 
-    protected $description = 'List the Composer packages only the modules this process does not run (MODULITH_RUNS) require.';
+    protected $description = 'List the Composer packages only the modules this process does not run (RUN_MODULES) require.';
 
     public function handle(ModuleRegistry $registry): int
     {

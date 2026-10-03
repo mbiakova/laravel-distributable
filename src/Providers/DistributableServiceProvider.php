@@ -2,9 +2,38 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Providers;
+namespace Distributable\Providers;
 
 use Composer\Autoload\ClassLoader;
+use Distributable\Config\Modules;
+use Distributable\Console\Commands\CacheModules;
+use Distributable\Console\Commands\ClearModules;
+use Distributable\Console\Commands\DeleteModule;
+use Distributable\Console\Commands\Doctor;
+use Distributable\Console\Commands\Install;
+use Distributable\Console\Commands\ListModules;
+use Distributable\Console\Commands\MakeModule;
+use Distributable\Console\Commands\PurgeModules;
+use Distributable\Console\Commands\UnusedPackages;
+use Distributable\Console\Migrations;
+use Distributable\Console\ModuleGenerators;
+use Distributable\Console\ModuleOption;
+use Distributable\Console\ModuleSeedCommand;
+use Distributable\Data\Module;
+use Distributable\Exceptions\ModuleException;
+use Distributable\Http\Controllers\StatusController;
+use Distributable\Jobs\BatchRepository;
+use Distributable\Jobs\FailedJobProvider;
+use Distributable\Services\Modules\CachedShadowRegistry;
+use Distributable\Services\Modules\DiscoveryCache;
+use Distributable\Services\Modules\ModuleColocation;
+use Distributable\Services\Modules\ModuleContext;
+use Distributable\Services\Modules\ModuleRegistry;
+use Distributable\Services\Modules\ModuleRpcTransport;
+use Distributable\Support\ModuleConcurrencyDriver;
+use Distributable\Support\ModuleDeferredCallbacks;
+use Distributable\Support\ModuleFactories;
+use Distributable\Support\ModuleTaskDispatcher;
 use Illuminate\Bus\BatchFactory;
 use Illuminate\Bus\BatchRepository as BatchRepositoryContract;
 use Illuminate\Bus\DatabaseBatchRepository;
@@ -32,43 +61,14 @@ use Laravel\Octane\Contracts\DispatchesTasks;
 use Microservices\Contracts\Colocation;
 use Microservices\Contracts\Rpc\RpcTransport;
 use Microservices\Services\Shadows\ShadowRegistry;
-use Modulith\Config\Modules;
-use Modulith\Console\Commands\CacheModules;
-use Modulith\Console\Commands\ClearModules;
-use Modulith\Console\Commands\DeleteModule;
-use Modulith\Console\Commands\Doctor;
-use Modulith\Console\Commands\Install;
-use Modulith\Console\Commands\ListModules;
-use Modulith\Console\Commands\MakeModule;
-use Modulith\Console\Commands\PurgeModules;
-use Modulith\Console\Commands\UnusedPackages;
-use Modulith\Console\Migrations;
-use Modulith\Console\ModuleGenerators;
-use Modulith\Console\ModuleOption;
-use Modulith\Console\ModuleSeedCommand;
-use Modulith\Data\Module;
-use Modulith\Exceptions\ModuleException;
-use Modulith\Http\Controllers\StatusController;
-use Modulith\Jobs\BatchRepository;
-use Modulith\Jobs\FailedJobProvider;
-use Modulith\Services\Modules\CachedShadowRegistry;
-use Modulith\Services\Modules\DiscoveryCache;
-use Modulith\Services\Modules\ModuleColocation;
-use Modulith\Services\Modules\ModuleContext;
-use Modulith\Services\Modules\ModuleRegistry;
-use Modulith\Services\Modules\ModuleRpcTransport;
-use Modulith\Support\ModuleConcurrencyDriver;
-use Modulith\Support\ModuleDeferredCallbacks;
-use Modulith\Support\ModuleFactories;
-use Modulith\Support\ModuleTaskDispatcher;
 
-final class ModulithServiceProvider extends BaseServiceProvider
+final class DistributableServiceProvider extends BaseServiceProvider
 {
     private static bool $guardsRemoteModules = false;
 
     public function register(): void
     {
-        $this->mergeConfigFrom(__DIR__.'/../../config/modulith.php', 'modulith');
+        $this->mergeConfigFrom(__DIR__.'/../../config/distributable.php', 'distributable');
 
         // Left null, these database drivers would keep the connection of whichever module first used them.
         $config = $this->app['config'];
@@ -121,7 +121,7 @@ final class ModulithServiceProvider extends BaseServiceProvider
     {
         $config = $this->app['config'];
 
-        $config->set('microservices.services', [...(array) $config->get('modulith.modules', []), ...(array) $config->get('microservices.services', [])]);
+        $config->set('microservices.services', [...(array) $config->get('distributable.modules', []), ...(array) $config->get('microservices.services', [])]);
     }
 
     /** Work started in a module but run later or elsewhere (defer, Concurrency, Octane tasks) keeps that module. */
@@ -217,7 +217,7 @@ final class ModulithServiceProvider extends BaseServiceProvider
         });
     }
 
-    /** Registers the service provider of every module this process boots (MODULITH_RUNS). */
+    /** Registers the service provider of every module this process boots (RUN_MODULES). */
     private function registerLocalModuleProviders(): void
     {
         $registry = $this->app->make(ModuleRegistry::class);
@@ -285,18 +285,18 @@ final class ModulithServiceProvider extends BaseServiceProvider
     public function boot(): void
     {
         $this->publishes([
-            __DIR__.'/../../config/modulith.php' => config_path('modulith.php'),
-        ], 'modulith-config');
+            __DIR__.'/../../config/distributable.php' => config_path('distributable.php'),
+        ], 'distributable-config');
 
         $this->switchContextOnJobsAndCommands();
 
         $statusRoute = $this->app->make(Modules::class)->getStatusRoute();
 
         if ($statusRoute !== null) {
-            Route::get($statusRoute, StatusController::class)->name('modulith.status');
+            Route::get($statusRoute, StatusController::class)->name('distributable.status');
         }
 
-        $this->optimizes(optimize: 'modulith:cache', clear: 'modulith:clear', key: 'modulith');
+        $this->optimizes(optimize: 'distributable:cache', clear: 'distributable:clear', key: 'distributable');
 
         if ($this->app->runningInConsole()) {
             Event::listen(CommandStarting::class, fn (CommandStarting $event) => $this->app->make(ModuleGenerators::class)->starting($event));

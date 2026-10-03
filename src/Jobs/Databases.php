@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Jobs;
+namespace Distributable\Jobs;
 
-use Modulith\Services\Modules\ModuleRegistry;
+use Distributable\Services\Modules\ModuleRegistry;
 
 final class Databases
 {

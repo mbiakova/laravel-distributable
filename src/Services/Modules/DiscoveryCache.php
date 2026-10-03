@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Services\Modules;
+namespace Distributable\Services\Modules;
 
 use Illuminate\Contracts\Foundation\Application;
 
 /**
- * What discovery found, written by modulith:cache to bootstrap/cache/modulith.php, like config:cache.
+ * What discovery found, written by distributable:cache to bootstrap/cache/distributable.php, like config:cache.
  *
  * @phpstan-type Cached array{
  *     modules: list<array{name: string, namespace: string, provider: string, path: string, hasDatabase: bool}>,
@@ -24,7 +24,7 @@ final class DiscoveryCache
 
     public function path(): string
     {
-        return $this->app->bootstrapPath('cache/modulith.php');
+        return $this->app->bootstrapPath('cache/distributable.php');
     }
 
     /** @return Cached|null */

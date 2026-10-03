@@ -5,15 +5,15 @@ declare(strict_types=1);
 use Apps\Iam\Http\Controllers\ConnectionController;
 use Apps\Iam\Jobs\RecordConnection;
 use Apps\Iam\Listeners\RecordEventConnection;
+use Distributable\Exceptions\ModuleException;
+use Distributable\Services\Modules\ModuleContext;
+use Distributable\Tests\Support\ModuleAppTestCase;
+use Distributable\Tests\Support\SomethingCommitted;
+use Distributable\Tests\Support\SomethingHappened;
 use Illuminate\Foundation\Testing\WithConsoleEvents;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
-use Modulith\Exceptions\ModuleException;
-use Modulith\Services\Modules\ModuleContext;
-use Modulith\Tests\Support\ModuleAppTestCase;
-use Modulith\Tests\Support\SomethingCommitted;
-use Modulith\Tests\Support\SomethingHappened;
 
 // As a real `php artisan` run does, so CommandStarting fires.
 uses(ModuleAppTestCase::class, WithConsoleEvents::class);

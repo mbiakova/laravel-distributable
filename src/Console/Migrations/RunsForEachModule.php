@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Console\Migrations;
+namespace Distributable\Console\Migrations;
 
+use Distributable\Services\Modules\ModuleContext;
+use Distributable\Services\Modules\ModuleMigrations;
+use Distributable\Services\Modules\ModuleRegistry;
 use Microservices\Migrations\ShadowMigration;
-use Modulith\Services\Modules\ModuleContext;
-use Modulith\Services\Modules\ModuleMigrations;
-use Modulith\Services\Modules\ModuleRegistry;
 use Symfony\Component\Console\Input\InputOption;
 
 /**

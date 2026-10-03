@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-use Modulith\Services\Modules\ModuleRegistry;
-use Modulith\Tests\Support\ModuleAppTestCase;
+use Distributable\Services\Modules\ModuleRegistry;
+use Distributable\Tests\Support\ModuleAppTestCase;
 
 uses(ModuleAppTestCase::class);
 
-it('knows the modules modulith.modules declares, and nothing else', function () {
+it('knows the modules distributable.modules declares, and nothing else', function () {
     expect(array_map(fn ($module) => $module->name, app(ModuleRegistry::class)->all()))->toBe(['analytics', 'gateway', 'iam']);
 });
 

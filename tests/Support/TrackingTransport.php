@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Tests\Support;
+namespace Distributable\Tests\Support;
 
 use Microservices\Contracts\Stream\TracksAcknowledgements;
 use Microservices\Contracts\Stream\Transport;

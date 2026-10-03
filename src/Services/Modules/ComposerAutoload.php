@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Services\Modules;
+namespace Distributable\Services\Modules;
 
-use Modulith\Config\Modules;
-use Modulith\Data\Module;
+use Distributable\Config\Modules;
+use Distributable\Data\Module;
 use stdClass;
 
 /**

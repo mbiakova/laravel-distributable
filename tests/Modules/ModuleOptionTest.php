@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
+use Distributable\Exceptions\ModuleException;
+use Distributable\Tests\Support\DefaultConnectionCommand;
+use Distributable\Tests\Support\ModuleAppTestCase;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Modulith\Exceptions\ModuleException;
-use Modulith\Tests\Support\DefaultConnectionCommand;
-use Modulith\Tests\Support\ModuleAppTestCase;
 
 uses(ModuleAppTestCase::class);
 

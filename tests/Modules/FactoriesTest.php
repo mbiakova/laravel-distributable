@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 use Apps\Iam\Database\Factories\UserFactory;
 use Apps\Iam\Models\User;
+use Distributable\Support\ModuleFactories;
+use Distributable\Tests\Support\ModuleAppTestCase;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Modulith\Support\ModuleFactories;
-use Modulith\Tests\Support\ModuleAppTestCase;
 
 uses(ModuleAppTestCase::class);
 

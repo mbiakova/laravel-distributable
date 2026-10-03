@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Services\Modules;
+namespace Distributable\Services\Modules;
 
 use Illuminate\Container\Container;
 use Microservices\Contracts\Rpc\RpcTransport;

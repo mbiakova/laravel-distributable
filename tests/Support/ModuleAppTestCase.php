@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Tests\Support;
+namespace Distributable\Tests\Support;
 
+use Distributable\Testing\InteractsWithModules;
+use Distributable\Tests\TestCase;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Foundation\Application;
-use Modulith\Testing\InteractsWithModules;
-use Modulith\Tests\TestCase;
 
 /** Boots the app against the fixture module tree, as a consumer application would. */
 abstract class ModuleAppTestCase extends TestCase
@@ -19,14 +19,14 @@ abstract class ModuleAppTestCase extends TestCase
     {
         $config = $app->make(Repository::class);
 
-        $config->set('modulith.modules', [
+        $config->set('distributable.modules', [
             'analytics' => [],
             'gateway' => [],
             'iam' => ['host' => 'http://iam.test'],
         ]);
-        $config->set('modulith.paths.modules', dirname(__DIR__).'/Fixtures/apps');
-        $config->set('modulith.paths.foundation', dirname(__DIR__).'/Fixtures/foundation');
-        $config->set('modulith.status_route', '/');
+        $config->set('distributable.paths.modules', dirname(__DIR__).'/Fixtures/apps');
+        $config->set('distributable.paths.foundation', dirname(__DIR__).'/Fixtures/foundation');
+        $config->set('distributable.status_route', '/');
 
         // The group iam's routes/admin.php lands in.
         $app->make('router')->middlewareGroup('admin', []);

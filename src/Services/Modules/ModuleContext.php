@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Services\Modules;
+namespace Distributable\Services\Modules;
 
 use Closure;
+use Distributable\Data\Module;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Support\Facades\Context;
-use Modulith\Data\Module;
 
 /**
  * Which module the running request, job or command belongs to; its connection becomes the
@@ -16,7 +16,7 @@ use Modulith\Data\Module;
  */
 final class ModuleContext
 {
-    public const string CONTEXT_KEY = 'modulith.module';
+    public const string CONTEXT_KEY = 'distributable.module';
 
     private ?string $applicationDefault = null;
 

@@ -37,5 +37,5 @@ php artisan microservices:shadows:want [--keepers=reports] [--sources=iam_users]
 php artisan microservices:shadows:announce iam_users [--keepers=reports]          # on the owner
 ```
 
-`modulith:cache` records each module's copies and sources, so a process doesn't scan the module
+`distributable:cache` records each module's copies and sources, so a process doesn't scan the module
 folders for them at boot.

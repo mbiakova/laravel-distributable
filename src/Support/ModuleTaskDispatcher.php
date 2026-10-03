@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Support;
+namespace Distributable\Support;
 
 use Closure;
+use Distributable\Services\Modules\ModuleContext;
 use Illuminate\Container\Container;
 use Laravel\Octane\Contracts\DispatchesTasks;
 use Laravel\Octane\SequentialTaskDispatcher;
 use Laravel\Octane\Swoole\ServerStateFile;
 use Laravel\Octane\Swoole\SwooleHttpTaskDispatcher;
 use Laravel\Octane\Swoole\SwooleTaskDispatcher;
-use Modulith\Services\Modules\ModuleContext;
 
 /**
  * Octane::concurrently() runs each task in a task worker, which has none of the request's module:

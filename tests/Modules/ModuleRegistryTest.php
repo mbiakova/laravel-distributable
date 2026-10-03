@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-use Modulith\Tests\TestCase;
+use Distributable\Tests\TestCase;
 
 uses(TestCase::class);
 
-use Modulith\Data\Module;
-use Modulith\Exceptions\ModuleException;
-use Modulith\Services\Modules\ModuleRegistry;
+use Distributable\Data\Module;
+use Distributable\Exceptions\ModuleException;
+use Distributable\Services\Modules\ModuleRegistry;
 
 /** @param list<string> $loadedModules */
 function registryLoading(array $loadedModules = ['*']): ModuleRegistry
@@ -19,14 +19,14 @@ function registryLoading(array $loadedModules = ['*']): ModuleRegistry
     ], $loadedModules);
 }
 
-it('treats every module as local when MODULITH_RUNS is *', function () {
+it('treats every module as local when RUN_MODULES is *', function () {
     $registry = registryLoading(['*']);
 
     expect($registry->local())->toHaveCount(2)
         ->and($registry->isLocal('analytics'))->toBeTrue();
 });
 
-it('narrows the local set to the MODULITH_RUNS list', function () {
+it('narrows the local set to the RUN_MODULES list', function () {
     $registry = registryLoading(['analytics']);
 
     $local = $registry->local();

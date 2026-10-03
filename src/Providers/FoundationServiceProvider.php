@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Providers;
+namespace Distributable\Providers;
 
 use Microservices\Providers\RpcServiceProvider;
 

@@ -5,6 +5,8 @@ declare(strict_types=1);
 use Apps\Iam\Events\UserRegistered;
 use Apps\Iam\Events\UserRenamed;
 use Apps\Iam\Support\Recorder;
+use Distributable\Tests\Support\ModuleAppTestCase;
+use Distributable\Tests\Support\RecordingTransport;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Microservices\Contracts\Stream\Bus;
@@ -17,8 +19,6 @@ use Microservices\Services\Stream\Dispatcher;
 use Microservices\Services\Stream\Outbox\Relay;
 use Microservices\Services\Stream\PayloadVersions;
 use Microservices\Services\Stream\TransportManager;
-use Modulith\Tests\Support\ModuleAppTestCase;
-use Modulith\Tests\Support\RecordingTransport;
 
 uses(ModuleAppTestCase::class);
 

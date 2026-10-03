@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Apps\Iam\Events\UserRegistered;
+use Distributable\Tests\Support\ModuleAppTestCase;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
@@ -12,19 +13,18 @@ use Microservices\Contracts\Stream\Transport;
 use Microservices\Data\Envelope;
 use Microservices\Providers\MicroservicesServiceProvider;
 use Microservices\Transports\Stream\QueueTransport;
-use Modulith\Tests\Support\ModuleAppTestCase;
 
 uses(ModuleAppTestCase::class);
 
 beforeEach(function () {
-    Config::set('queue.connections.modulith', [
+    Config::set('queue.connections.distributable', [
         'driver' => 'database',
         'connection' => 'iam',
         'table' => 'jobs',
         'queue' => 'default',
         'retry_after' => 90,
     ]);
-    Config::set('microservices.events.streams.default', ['driver' => 'queue', 'connection' => 'modulith']);
+    Config::set('microservices.events.streams.default', ['driver' => 'queue', 'connection' => 'distributable']);
 
     Schema::connection('iam')->create('jobs', function (Blueprint $table): void {
         $table->id();
@@ -47,7 +47,7 @@ it('fans an envelope out to one queue per declared module, database or not', fun
 it('runs the shipped default stream on the application default queue connection once its driver is queue', function () {
     $shipped = (require dirname((string) (new ReflectionClass(MicroservicesServiceProvider::class))->getFileName(), 3).'/config/microservices.php')['events']['streams']['default'];
     Config::set('microservices.events.streams.default', [...$shipped, 'driver' => 'queue']);
-    Config::set('queue.default', 'modulith');
+    Config::set('queue.default', 'distributable');
 
     $this->app->make(Bus::class)->emit(new UserRegistered(5, 'ada'));
 

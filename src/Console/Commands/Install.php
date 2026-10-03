@@ -2,22 +2,22 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Console\Commands;
+namespace Distributable\Console\Commands;
 
+use Distributable\Config\Modules;
+use Distributable\Services\Modules\ComposerAutoload;
 use Illuminate\Console\Command;
-use Modulith\Config\Modules;
-use Modulith\Services\Modules\ComposerAutoload;
 
 final class Install extends Command
 {
-    protected $signature = 'modulith:install';
+    protected $signature = 'distributable:install';
 
-    protected $description = 'Publish config/modulith.php and create the modules and foundation directories.';
+    protected $description = 'Publish config/distributable.php and create the modules and foundation directories.';
 
     public function handle(Modules $config, ComposerAutoload $autoload): int
     {
-        if (! is_file(config_path('modulith.php'))) {
-            copy(dirname(__DIR__, 3).'/config/modulith.php', config_path('modulith.php'));
+        if (! is_file(config_path('distributable.php'))) {
+            copy(dirname(__DIR__, 3).'/config/distributable.php', config_path('distributable.php'));
         }
 
         $modules = $config->getModulesPath();
@@ -35,7 +35,7 @@ final class Install extends Command
 
                 namespace {$config->getFoundationNamespace()};
 
-                use Modulith\\Providers\\FoundationServiceProvider as BaseServiceProvider;
+                use Distributable\\Providers\\FoundationServiceProvider as BaseServiceProvider;
 
                 final class FoundationServiceProvider extends BaseServiceProvider
                 {
@@ -47,7 +47,7 @@ final class Install extends Command
 
         $autoload->add($autoload->foundationEntries());
 
-        $this->components->info('Laravel Modulith is installed. Next: php artisan modulith:make-module <name> [--database]');
+        $this->components->info('Laravel Distributable is installed. Next: php artisan distributable:make-module <name> [--database]');
 
         return self::SUCCESS;
     }

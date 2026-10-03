@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
+use Distributable\Tests\Support\ModuleAppTestCase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Modulith\Tests\Support\ModuleAppTestCase;
 
 uses(ModuleAppTestCase::class);
 

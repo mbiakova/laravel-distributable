@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-use Modulith\Testing\Boundaries;
-use Modulith\Tests\Support\ModuleAppTestCase;
+use Distributable\Testing\Boundaries;
+use Distributable\Tests\Support\ModuleAppTestCase;
 
 uses(ModuleAppTestCase::class);
 
@@ -45,7 +45,7 @@ it('lets a module name its own tables and its copies of another module tables', 
 });
 
 it('reports the application naming a module, in app/, routes/ or config/', function () {
-    $root = sys_get_temp_dir().'/modulith-app-'.uniqid();
+    $root = sys_get_temp_dir().'/distributable-app-'.uniqid();
     mkdir($root.'/app/Http', recursive: true);
     $this->app->useAppPath($root.'/app');
     $file = $root.'/app/Http/Leak.php';

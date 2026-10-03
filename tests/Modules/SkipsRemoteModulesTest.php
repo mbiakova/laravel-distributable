@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
+use Distributable\Exceptions\ModuleException;
+use Distributable\Services\Modules\ModuleRegistry;
+use Distributable\Tests\Support\WithoutIamTestCase;
 use Foundation\Iam\Contracts\IamService;
 use Foundation\Iam\Services\IamRpcService;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
-use Modulith\Exceptions\ModuleException;
-use Modulith\Services\Modules\ModuleRegistry;
-use Modulith\Tests\Support\WithoutIamTestCase;
 
 uses(WithoutIamTestCase::class);
 
@@ -35,16 +35,16 @@ it('refuses to load a class of a module running elsewhere, whatever is on disk',
 })->throws(ModuleException::class, 'belongs to module [iam], which this process does not run');
 
 it('deletes the folder of the modules this process does not run, which config still declares', function () {
-    $root = sys_get_temp_dir().'/modulith-purge-'.uniqid();
+    $root = sys_get_temp_dir().'/distributable-purge-'.uniqid();
     File::copyDirectory(dirname(__DIR__).'/Fixtures/apps', $root);
-    config()->set('modulith.paths.modules', $root);
+    config()->set('distributable.paths.modules', $root);
     $this->app->forgetInstance(ModuleRegistry::class);
 
     // The purge deletes files: it must only ever see the copy.
     expect($this->app->make(ModuleRegistry::class)->get('iam')->path())->toBe($root.'/Iam');
 
     try {
-        $this->artisan('modulith:purge --force')->expectsOutput('→ analytics purged')->expectsOutput('→ iam purged')->assertSuccessful();
+        $this->artisan('distributable:purge --force')->expectsOutput('→ analytics purged')->expectsOutput('→ iam purged')->assertSuccessful();
 
         $this->app->forgetInstance(ModuleRegistry::class);
 
@@ -58,16 +58,16 @@ it('deletes the folder of the modules this process does not run, which config st
 });
 
 it('lists the packages only the modules running elsewhere require', function () {
-    $root = sys_get_temp_dir().'/modulith-packages-'.uniqid();
+    $root = sys_get_temp_dir().'/distributable-packages-'.uniqid();
     File::copyDirectory(dirname(__DIR__).'/Fixtures/apps', $root);
-    config()->set('modulith.paths.modules', $root);
+    config()->set('distributable.paths.modules', $root);
     $this->app->forgetInstance(ModuleRegistry::class);
 
     File::put($root.'/Iam/composer.json', json_encode(['require' => ['php' => '^8.4', 'ext-json' => '*', 'acme/only-iam' => '^1.0', 'acme/shared' => '^1.0']]));
     File::put($root.'/Gateway/composer.json', json_encode(['require' => ['acme/shared' => '^1.0', 'acme/only-gateway' => '^1.0']]));
 
     try {
-        $this->artisan('modulith:unused-packages')->expectsOutput('acme/only-iam')->assertSuccessful();
+        $this->artisan('distributable:unused-packages')->expectsOutput('acme/only-iam')->assertSuccessful();
     } finally {
         File::deleteDirectory($root);
     }

@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Services\Modules;
+namespace Distributable\Services\Modules;
 
+use Distributable\Config\Modules;
+use Distributable\Data\Module;
 use Illuminate\Container\Container;
 use Microservices\Services\Shadows\ShadowRegistry;
-use Modulith\Config\Modules;
-use Modulith\Data\Module;
 
 /**
  * Which migrations run in which database: the application's own in the default one, and in each

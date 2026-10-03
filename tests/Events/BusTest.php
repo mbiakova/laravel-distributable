@@ -6,6 +6,8 @@ use Apps\Iam\Events\UserAudited;
 use Apps\Iam\Events\UserIgnored;
 use Apps\Iam\Events\UserRegistered;
 use Apps\Iam\Support\Recorder;
+use Distributable\Tests\Support\ModuleAppTestCase;
+use Distributable\Tests\Support\RecordingTransport;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\DB;
@@ -15,8 +17,6 @@ use Microservices\Data\Envelope;
 use Microservices\Exceptions\ConfigurationException;
 use Microservices\Services\Stream\Dispatcher;
 use Microservices\Services\Stream\TransportManager;
-use Modulith\Tests\Support\ModuleAppTestCase;
-use Modulith\Tests\Support\RecordingTransport;
 
 uses(ModuleAppTestCase::class);
 

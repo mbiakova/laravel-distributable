@@ -2,17 +2,17 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Testing;
+namespace Distributable\Testing;
 
 use Closure;
+use Distributable\Exceptions\ModuleException;
+use Distributable\Services\Modules\ModuleContext;
+use Distributable\Services\Modules\ModuleRegistry;
 use Illuminate\Foundation\Testing\WithConsoleEvents;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
 use Microservices\Data\Envelope;
 use Microservices\Services\Stream\Dispatcher;
-use Modulith\Exceptions\ModuleException;
-use Modulith\Services\Modules\ModuleContext;
-use Modulith\Services\Modules\ModuleRegistry;
 use PHPUnit\Framework\Assert;
 use ReflectionFunction;
 

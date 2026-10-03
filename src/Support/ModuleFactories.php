@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Support;
+namespace Distributable\Support;
 
+use Distributable\Services\Modules\ModuleRegistry;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
-use Modulith\Services\Modules\ModuleRegistry;
 use Throwable;
 
 /** A module's factories are {Namespace}\Database\Factories, in {module}/database/factories; a class outside a module keeps Laravel's rule. */

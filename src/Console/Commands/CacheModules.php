@@ -2,19 +2,19 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Console\Commands;
+namespace Distributable\Console\Commands;
 
 use Composer\Autoload\ClassLoader;
+use Distributable\Data\Module;
+use Distributable\Services\Modules\DiscoveryCache;
+use Distributable\Services\Modules\ModuleRegistry;
 use Illuminate\Console\Command;
 use Microservices\Services\Shadows\ShadowRegistry;
-use Modulith\Data\Module;
-use Modulith\Services\Modules\DiscoveryCache;
-use Modulith\Services\Modules\ModuleRegistry;
 
 /** Run on deploy (php artisan optimize runs it): what the module folders tell is read from a file. */
 final class CacheModules extends Command
 {
-    protected $signature = 'modulith:cache';
+    protected $signature = 'distributable:cache';
 
     protected $description = 'Cache what the module folders tell: namespaces, databases, copies and shadow sources.';
 

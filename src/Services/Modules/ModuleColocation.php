@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Services\Modules;
+namespace Distributable\Services\Modules;
 
 use Closure;
+use Distributable\Config\Modules;
+use Distributable\Data\Module;
 use Microservices\Contracts\Colocation;
-use Modulith\Config\Modules;
-use Modulith\Data\Module;
 
-/** Each module is a service: the ones MODULITH_RUNS lists run in this process, each in its own context and database. */
+/** Each module is a service: the ones RUN_MODULES lists run in this process, each in its own context and database. */
 final readonly class ModuleColocation implements Colocation
 {
     public function __construct(

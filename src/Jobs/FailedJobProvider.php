@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Jobs;
+namespace Distributable\Jobs;
 
 use DateTimeInterface;
+use Distributable\Services\Modules\ModuleRegistry;
 use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Queue\Failed\DatabaseUuidFailedJobProvider;
-use Modulith\Services\Modules\ModuleRegistry;
 
 /**
  * Stores a failed job in the database of the module owning the job class; reads go through the

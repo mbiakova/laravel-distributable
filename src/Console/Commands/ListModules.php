@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Console\Commands;
+namespace Distributable\Console\Commands;
 
+use Distributable\Config\Modules;
+use Distributable\Data\Module;
+use Distributable\Services\Modules\ModuleRegistry;
 use Illuminate\Console\Command;
-use Modulith\Config\Modules;
-use Modulith\Data\Module;
-use Modulith\Services\Modules\ModuleRegistry;
 
 final class ListModules extends Command
 {
-    protected $signature = 'modulith:list';
+    protected $signature = 'distributable:list';
 
     protected $description = 'List the modules, and where each one runs.';
 

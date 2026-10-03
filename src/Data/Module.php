@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Data;
+namespace Distributable\Data;
 
+use Distributable\Exceptions\ModuleException;
 use Illuminate\Support\Str;
-use Modulith\Exceptions\ModuleException;
 
 /**
  * Topology-independent descriptor of one module: identity and conventions only.

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Exceptions;
+namespace Distributable\Exceptions;
 
 use RuntimeException;
 
@@ -31,12 +31,12 @@ final class ModuleException extends RuntimeException
 
     public static function notLocal(string $class, string $module): self
     {
-        return new self("[{$class}] belongs to module [{$module}], which this process does not run (MODULITH_RUNS): go through its foundation contract or an event.");
+        return new self("[{$class}] belongs to module [{$module}], which this process does not run (RUN_MODULES): go through its foundation contract or an event.");
     }
 
     public static function missingFolder(string $module, string $path): self
     {
-        return new self("Module [{$module}] runs here (MODULITH_RUNS) but [{$path}] does not exist: was it purged from this image?");
+        return new self("Module [{$module}] runs here (RUN_MODULES) but [{$path}] does not exist: was it purged from this image?");
     }
 
     /** A class the package needs to attach to a module lives outside every module namespace. */

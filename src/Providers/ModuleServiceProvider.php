@@ -2,8 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Modulith\Providers;
+namespace Distributable\Providers;
 
+use Distributable\Http\Middleware\SetModuleContext;
+use Distributable\Services\Modules\ModuleContext;
+use Distributable\Traits\ResolvesModule;
 use Illuminate\Console\Command;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Events\ShouldHandleEventsAfterCommit;
@@ -14,16 +17,13 @@ use Illuminate\Support\ServiceProvider as BaseServiceProvider;
 use Illuminate\Support\Str;
 use Illuminate\View\Compilers\BladeCompiler;
 use Microservices\Services\Rpc\LocalServices;
-use Modulith\Http\Middleware\SetModuleContext;
-use Modulith\Services\Modules\ModuleContext;
-use Modulith\Traits\ResolvesModule;
 
 /**
  * Base service provider a module extends to get, without manual wiring: config merging
  * (each {module}/config/*.php deep-merges into the matching root config),
  * translations ({module}/lang, namespaced by the module name),
  * routes ({module}/routes/{name}.php, prefixed {module}/{name}) and console commands.
- * Registered only for local modules (ModulithServiceProvider follows MODULITH_RUNS), so a
+ * Registered only for local modules (DistributableServiceProvider follows RUN_MODULES), so a
  * module's config lands only on the nodes that run it.
  */
 abstract class ModuleServiceProvider extends BaseServiceProvider

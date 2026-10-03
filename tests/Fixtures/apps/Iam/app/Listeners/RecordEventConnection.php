@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Apps\Iam\Listeners;
 
+use Distributable\Tests\Support\SomethingHappened;
 use Illuminate\Support\Facades\DB;
-use Modulith\Tests\Support\SomethingHappened;
 
 final class RecordEventConnection
 {
