@@ -54,35 +54,36 @@ The rest of the documentation is in `docs/`:
 
 ## Why
 
-Microservices exist for good reasons: a team ships its service without waiting for the others, a
-failure stays inside one service, and the part under load scales alone.
+How many services a platform runs and how many applications its code is split into are two
+different questions, usually answered as one.
 
-Each of those is bought with a distributed system: calls that fail over the network, data that no
-longer changes in one transaction, contracts to version, and a pipeline, a database and monitoring
-per service. That price is due on the first day. The benefits come later, with several teams or
-with a load one service can't share with the rest.
+Running as several services is an infrastructure need: a part has to scale alone, be deployed on
+its own schedule, or keep working when another fails. Being several applications, each with its
+repository, its pipeline and its dependencies, is only the usual way to get there, and it has a
+price of its own: contracts versioned across repositories, the same plumbing rewritten in each,
+changes that span several of them.
 
-Splitting early also means drawing the boundaries before the domain is understood, and a boundary
-drawn wrong between services is far harder to move than one inside a codebase. The usual result is
-a distributed monolith: services that still have to change and be deployed together.
+The need is rarely the same for every part. A few modules have to run apart. Most have no reason
+to, and are better off together: one process to deploy and to watch, and calls between them that
+never leave it.
 
-What is hard to add later is not the deployment. It is the separation: each part owning its data
-and talking to the others only through contracts. So this package has you build that separation
-from the first line of code, and leaves where each module runs to a setting:
+This package keeps the two questions apart. The modules are separated the way services are, in
+one codebase: each owns its data and talks to the others only through contracts. How many
+processes they run in is a setting, chosen module by module and changed in either direction:
 
 ```dotenv
-# at first, every module in one process
+# every module in one process
 MODULITH_RUNS=*
 
-# later, the busy module runs alone and the others stay together
+# one module alone, the others grouped
 MODULITH_RUNS=transactions        # process A
 MODULITH_RUNS=iam,analytics       # process B
 ```
 
-Because a module already owns its data and only talks through events and contracts, moving it to
-its own process doesn't require a rewrite. Events go through a stream in both setups, so they
-behave the same whether two modules share a process or not. Modules with no reason to be apart
-stay together, and you move out only the one whose team or load justifies it.
+A call between two modules of the same process is a direct method call: no HTTP, no signature,
+nothing on the network. It becomes a signed HTTP call only between two processes. Events go
+through a stream in both setups. The calling code is the same in every case, so grouping modules
+or moving one out is not a rewrite.
 
 ## How it works
 
@@ -109,7 +110,7 @@ Modules communicate in two ways:
 | Mode | Used for | Same process | Different processes |
 |---|---|---|---|
 | Event stream (asynchronous) | announcing that something happened | through the stream | through the stream |
-| RPC (synchronous) | asking another module for an answer right away: reading its data, or having it perform an action whose result the caller needs | the module's own class, in its context | a signed HTTP call |
+| RPC (synchronous) | asking another module for an answer right away: reading its data, or having it perform an action whose result the caller needs | a direct method call on the module's own class, in its context: no HTTP | a signed HTTP call |
 
 Shadows, the read-only copies described below, are built on events.
 

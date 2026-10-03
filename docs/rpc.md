@@ -35,6 +35,9 @@ analytics ─► IamService (the contract) ─► IamRpcService::call('findUser'
                                                                    the same call, in iam's context, on the other side
 ```
 
+When the two modules share a process, the call is a direct method call: no HTTP, no signature,
+nothing on the network. It becomes a signed HTTP call only between two processes.
+
 Both sides end in the same place, `Modulith\Services\Rpc\LocalServices`. It looks up the
 implementation the module declared in `$services`, runs the method in the module's context, then
 returns the answer as JSON decodes it. A caller therefore gets the same thing whether iam runs
