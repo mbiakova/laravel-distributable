@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Apps\Iam\Events;
 
-use Modulith\Events\Event;
+use Microservices\Events\Event;
 
 /** Emitted by the module, listened to by nobody — the no-subscriber path. */
 final class UserIgnored extends Event

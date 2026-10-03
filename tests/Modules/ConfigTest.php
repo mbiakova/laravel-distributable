@@ -8,13 +8,13 @@ uses(TestCase::class);
 
 use Modulith\Config\Modules;
 
-it('merges the modulith config with its defaults', function () {
+it('merges the modulith config with its defaults, and the microservices one next to it', function () {
     expect(config('modulith.modules'))->toBe([])
         ->and(config('modulith.runs'))->toBe('*')
         ->and(config('modulith.paths.modules'))->toBe('apps')
         ->and(config('modulith.namespaces.modules'))->toBe('Apps')
-        ->and(config('modulith.events.streams.default.key'))->toBe('modulith:events')
-        ->and(config('modulith.rpc.transport'))->toBe('http');
+        ->and(config('microservices.events.streams.default.key'))->toBe('microservices:events')
+        ->and(config('microservices.rpc.transport'))->toBe('http');
 });
 
 it('reads MODULITH_RUNS as a list of module names, * standing for every module', function () {

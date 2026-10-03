@@ -1,14 +1,14 @@
 # Read-only copies (shadows)
 
-When a module needs another module's rows locally, for example to join, filter or sort on them,
-it can keep a copy in its own database, kept up to date by events. Only the source module writes
-the data.
+Copies of another module's rows are [laravel-microservices' copies](https://github.com/mk-josias/laravel-microservices/blob/main/docs/shadows.md):
+each module is a service. What a module adds is where each piece lives, and which database the
+copy is in.
 
 ```php
 // apps/Iam/app/Models/User.php, the source: the $shadowed fields are copied
-final class User extends \Illuminate\Database\Eloquent\Model implements \Modulith\Contracts\Shadows\Shadowed
+final class User extends \Illuminate\Database\Eloquent\Model implements \Microservices\Contracts\Shadows\Shadowed
 {
-    use \Modulith\Traits\ShadowSource;
+    use \Microservices\Traits\ShadowSource;
 
     protected $table = 'iam_users';
 
@@ -16,7 +16,7 @@ final class User extends \Illuminate\Database\Eloquent\Model implements \Modulit
 }
 
 // foundation/Iam/Shadows/UserShadow.php, the shape of the copy, declared once by iam
-abstract class UserShadow extends \Modulith\Models\ShadowModel
+abstract class UserShadow extends \Microservices\Models\ShadowModel
 {
     public static function owner(): string { return 'iam'; }
 
@@ -28,22 +28,14 @@ final class UserShadow extends \Foundation\Iam\Shadows\UserShadow {}
 ```
 
 iam publishes the migration of the copy's table in `foundation/Iam/database/shadows/`, extending
-`Modulith\Migrations\ShadowMigration`. `migrate` runs it in the database of every module that keeps
-a copy. A copy always writes to the database of the module that keeps it.
-
-```
-iam: User saved / deleted ─► ShadowChanged event ─► analytics consumer ─► UserShadow::sync()
-```
-
-A copy rejects any write that doesn't come from `sync()`, and a deleted source row becomes a soft
-delete in the copy. To fill a copy created after the source already had data:
+`Microservices\Migrations\ShadowMigration`. `migrate` runs it in the database of every module that
+keeps a copy. A copy always writes to the database of the module that keeps it, even when one
+consumer serves several keepers.
 
 ```bash
-php artisan modulith:shadows:want [--keepers=reports] [--sources=iam_users]   # on the keeping module: ask the owners to send their rows again
-php artisan modulith:shadows:announce iam_users [--keepers=reports]          # on the owner: send every row again
+php artisan microservices:shadows:want [--keepers=reports] [--sources=iam_users]   # on the keeping module
+php artisan microservices:shadows:announce iam_users [--keepers=reports]          # on the owner
 ```
 
-`--keepers` limits the command to the modules that keep the copy, for example a new module with an
-empty database. The others don't receive the rows again. Both commands address the event through
-its `recipients`, so only those modules update their copy.
-
+`modulith:cache` records each module's copies and sources, so a process doesn't scan the module
+folders for them at boot.

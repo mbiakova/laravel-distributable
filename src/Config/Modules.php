@@ -18,6 +18,14 @@ final readonly class Modules
         return array_map(strval(...), array_keys((array) $this->config->get('modulith.modules', [])));
     }
 
+    /** The URL a module answers on when it runs in another process; null when none is set. */
+    public function getHost(string $module): ?string
+    {
+        $host = $this->config->get("modulith.modules.{$module}.host");
+
+        return is_array($host) ? (is_string($host['url'] ?? null) ? $host['url'] : null) : (is_string($host) ? $host : null);
+    }
+
     /** @return list<string> ['*'] for every module, or the names MODULITH_RUNS lists */
     public function getLoadedModules(): array
     {

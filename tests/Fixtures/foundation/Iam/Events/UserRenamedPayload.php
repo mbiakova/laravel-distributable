@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Foundation\Iam\Events;
 
-use Modulith\Contracts\Stream\Versioned;
+use Microservices\Contracts\Stream\Versioned;
 
 /** Version 1 carried `name`, version 2 renamed it `full_name`, version 3 added `locale`. */
 final class UserRenamedPayload implements Versioned

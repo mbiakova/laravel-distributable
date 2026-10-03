@@ -6,11 +6,11 @@ namespace Modulith\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
+use Microservices\Config\Rpc;
+use Microservices\Services\Rpc\RpcServices;
 use Modulith\Config\Modules;
-use Modulith\Config\Rpc;
 use Modulith\Services\Modules\ComposerAutoload;
 use Modulith\Services\Modules\ModuleRegistry;
-use Modulith\Services\Rpc\RpcServices;
 use Modulith\Testing\Boundaries;
 
 final class Doctor extends Command
@@ -48,15 +48,15 @@ final class Doctor extends Command
         }
 
         foreach ($services->all() as $contract => $service) {
-            if ($service['module'] === null) {
+            if ($service['service'] === null) {
                 $problems[] = "{$contract} is not in the foundation of a declared module.";
-            } elseif (! $registry->isLocal($service['module']) && ! $rpc->hasHost($service['module'])) {
-                $problems[] = "[{$service['module']}] runs elsewhere and serves {$contract}, but modulith.modules.{$service['module']}.host is not set.";
+            } elseif (! $registry->isLocal($service['service']) && $config->getHost($service['service']) === null) {
+                $problems[] = "[{$service['service']}] runs elsewhere and serves {$contract}, but modulith.modules.{$service['service']}.host is not set.";
             }
         }
 
         if ($services->all() !== [] && $rpc->getSecret() === '') {
-            $problems[] = 'Modules serve RPC contracts but modulith.rpc.secret is empty: set MODULITH_RPC_SECRET or APP_KEY.';
+            $problems[] = 'Modules serve RPC contracts but microservices.rpc.secret is empty: set MICROSERVICES_RPC_SECRET or APP_KEY.';
         }
 
         foreach ($boundaries->violations() as $violation) {

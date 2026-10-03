@@ -13,9 +13,9 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider as BaseServiceProvider;
 use Illuminate\Support\Str;
 use Illuminate\View\Compilers\BladeCompiler;
+use Microservices\Services\Rpc\LocalServices;
 use Modulith\Http\Middleware\SetModuleContext;
 use Modulith\Services\Modules\ModuleContext;
-use Modulith\Services\Rpc\LocalServices;
 use Modulith\Traits\ResolvesModule;
 
 /**
@@ -48,7 +48,7 @@ abstract class ModuleServiceProvider extends BaseServiceProvider
         // A contract with an RpcService is rebound to it by the foundation provider: every call
         // then takes the same path, in this process or not. One without stays bound here.
         foreach ($this->services as $contract => $implementation) {
-            $local->add($this->module, $contract, $implementation);
+            $local->add($this->module->name, $contract, $implementation);
             $this->app->bind($contract, $implementation);
         }
     }
@@ -183,6 +183,6 @@ abstract class ModuleServiceProvider extends BaseServiceProvider
             return;
         }
 
-        $this->commands(modulith_classes_with(Command::class, $this->module->classPath()));
+        $this->commands(microservices_classes_with(Command::class, $this->module->classPath()));
     }
 }

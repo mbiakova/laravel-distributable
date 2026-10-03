@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modulith\Tests\Support;
 
-use Modulith\Contracts\Stream\TracksAcknowledgements;
-use Modulith\Contracts\Stream\Transport;
-use Modulith\Data\Envelope;
+use Microservices\Contracts\Stream\TracksAcknowledgements;
+use Microservices\Contracts\Stream\Transport;
+use Microservices\Data\Envelope;
 
 /** Numbers its entries 1-0, 2-0, …; entries up to $acknowledgedUpTo count as read by everyone. */
 final class TrackingTransport implements TracksAcknowledgements, Transport

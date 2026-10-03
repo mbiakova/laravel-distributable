@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modulith\Console\Commands;
 
 use Illuminate\Console\Command;
-use Modulith\Config\Rpc;
+use Modulith\Config\Modules;
 use Modulith\Data\Module;
 use Modulith\Services\Modules\ModuleRegistry;
 
@@ -15,7 +15,7 @@ final class ListModules extends Command
 
     protected $description = 'List the modules, and where each one runs.';
 
-    public function handle(ModuleRegistry $registry, Rpc $rpc): int
+    public function handle(ModuleRegistry $registry, Modules $config): int
     {
         $this->table(
             ['Module', 'Namespace', 'Runs here', 'Database', 'Remote host'],
@@ -24,7 +24,7 @@ final class ListModules extends Command
                 $module->namespace,
                 $registry->isLocal($module->name) ? 'yes' : 'no',
                 $module->hasDatabase ? $module->connection() : '—',
-                ! $registry->isLocal($module->name) && $rpc->hasHost($module->name) ? $rpc->getHost($module->name) : '—',
+                ! $registry->isLocal($module->name) ? ($config->getHost($module->name) ?? '—') : '—',
             ], $registry->all()),
         );
 

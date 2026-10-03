@@ -23,54 +23,40 @@ use Illuminate\Database\DatabaseManager;
 use Illuminate\Process\Factory as ProcessFactory;
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Routing\Events\RouteMatched;
-use Illuminate\Routing\Router;
 use Illuminate\Support\Defer\DeferredCallbackCollection;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider as BaseServiceProvider;
 use Laravel\Octane\Contracts\DispatchesTasks;
+use Microservices\Contracts\Colocation;
+use Microservices\Contracts\Rpc\RpcTransport;
+use Microservices\Services\Shadows\ShadowRegistry;
 use Modulith\Config\Modules;
-use Modulith\Console\Commands\AnnounceShadows;
 use Modulith\Console\Commands\CacheModules;
 use Modulith\Console\Commands\ClearModules;
-use Modulith\Console\Commands\ConsumeEvents;
 use Modulith\Console\Commands\DeleteModule;
 use Modulith\Console\Commands\Doctor;
-use Modulith\Console\Commands\ExportEvents;
-use Modulith\Console\Commands\ImportEvents;
 use Modulith\Console\Commands\Install;
 use Modulith\Console\Commands\ListModules;
 use Modulith\Console\Commands\MakeModule;
-use Modulith\Console\Commands\PublishEvents;
 use Modulith\Console\Commands\PurgeModules;
-use Modulith\Console\Commands\RepublishEvents;
-use Modulith\Console\Commands\TrimEvents;
 use Modulith\Console\Commands\UnusedPackages;
-use Modulith\Console\Commands\WantShadows;
 use Modulith\Console\Migrations;
 use Modulith\Console\ModuleGenerators;
 use Modulith\Console\ModuleOption;
 use Modulith\Console\ModuleSeedCommand;
-use Modulith\Contracts\Rpc\RpcTransport;
-use Modulith\Contracts\Stream\Bus;
-use Modulith\Contracts\Stream\Transport;
 use Modulith\Data\Module;
 use Modulith\Exceptions\ModuleException;
-use Modulith\Http\Controllers\RpcController;
 use Modulith\Http\Controllers\StatusController;
-use Modulith\Http\Middleware\VerifyRpcSignature;
 use Modulith\Jobs\BatchRepository;
 use Modulith\Jobs\FailedJobProvider;
+use Modulith\Services\Modules\CachedShadowRegistry;
 use Modulith\Services\Modules\DiscoveryCache;
+use Modulith\Services\Modules\ModuleColocation;
 use Modulith\Services\Modules\ModuleContext;
 use Modulith\Services\Modules\ModuleRegistry;
-use Modulith\Services\Rpc\LocalServices;
-use Modulith\Services\Rpc\RpcServices;
-use Modulith\Services\Rpc\RpcTransportManager;
-use Modulith\Services\Stream\Emitter;
-use Modulith\Services\Stream\PayloadVersions;
-use Modulith\Services\Stream\TransportManager;
+use Modulith\Services\Modules\ModuleRpcTransport;
 use Modulith\Support\ModuleConcurrencyDriver;
 use Modulith\Support\ModuleDeferredCallbacks;
 use Modulith\Support\ModuleFactories;
@@ -93,21 +79,10 @@ final class ModulithServiceProvider extends BaseServiceProvider
 
         $this->carryTheModuleIntoDeferredWork();
 
-        $this->app->singleton(TransportManager::class);
-        $this->app->singleton(PayloadVersions::class);
-        $this->app->singleton(RpcTransportManager::class);
-        $this->app->singleton(RpcServices::class);
-        $this->app->singleton(LocalServices::class);
-        $this->app->bind(RpcTransport::class, RpcTransportManager::class);
-
-        $this->app->singleton(Bus::class, Emitter::class);
-
-        // Injecting the contract yields the default stream; the manager stays the seam
-        // where a consumer registers its own driver with extend().
-        $this->app->bind(
-            Transport::class,
-            static fn (Application $app): Transport => $app->make(TransportManager::class)->stream(),
-        );
+        // Every module is a service of laravel-microservices: its events, its RPC calls, its copies.
+        $this->app->bind(Colocation::class, ModuleColocation::class);
+        $this->app->bind(RpcTransport::class, ModuleRpcTransport::class);
+        $this->app->singleton(ShadowRegistry::class, CachedShadowRegistry::class);
 
         $this->app->singleton(DiscoveryCache::class);
 
@@ -136,8 +111,17 @@ final class ModulithServiceProvider extends BaseServiceProvider
         // On the booting callback: after every provider (and the app's own configuration)
         // has registered, before any provider boots — module providers slot in between.
         $this->app->booting(function (): void {
+            $this->declareModulesAsServices();
             $this->registerLocalModuleProviders();
         });
+    }
+
+    /** microservices.services gets every module with its host, so a call to a module running elsewhere finds it. */
+    private function declareModulesAsServices(): void
+    {
+        $config = $this->app['config'];
+
+        $config->set('microservices.services', [...(array) $config->get('modulith.modules', []), ...(array) $config->get('microservices.services', [])]);
     }
 
     /** Work started in a module but run later or elsewhere (defer, Concurrency, Octane tasks) keeps that module. */
@@ -304,16 +288,6 @@ final class ModulithServiceProvider extends BaseServiceProvider
             __DIR__.'/../../config/modulith.php' => config_path('modulith.php'),
         ], 'modulith-config');
 
-        // The called side of HttpRpcTransport, one endpoint per local module: nothing unsigned reaches it.
-        $this->app->make(Router::class)->pushMiddlewareToGroup('rpc', VerifyRpcSignature::class);
-
-        foreach ($this->app->make(ModuleRegistry::class)->local() as $module) {
-            Route::post("{$module->name}/rpc/{method}", RpcController::class)
-                ->middleware('rpc')
-                ->defaults('module', $module->name)
-                ->name("modulith.rpc.{$module->name}");
-        }
-
         $this->switchContextOnJobsAndCommands();
 
         $statusRoute = $this->app->make(Modules::class)->getStatusRoute();
@@ -330,8 +304,7 @@ final class ModulithServiceProvider extends BaseServiceProvider
 
             $this->commands([
                 Install::class, MakeModule::class, DeleteModule::class, ListModules::class, Doctor::class, PurgeModules::class, UnusedPackages::class,
-                CacheModules::class, ClearModules::class, PublishEvents::class, RepublishEvents::class, ConsumeEvents::class,
-                TrimEvents::class, ExportEvents::class, ImportEvents::class, AnnounceShadows::class, WantShadows::class,
+                CacheModules::class, ClearModules::class,
             ]);
         }
     }

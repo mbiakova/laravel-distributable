@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modulith\Console\Migrations;
 
-use Modulith\Migrations\ShadowMigration;
+use Microservices\Migrations\ShadowMigration;
 use Modulith\Services\Modules\ModuleContext;
 use Modulith\Services\Modules\ModuleMigrations;
 use Modulith\Services\Modules\ModuleRegistry;

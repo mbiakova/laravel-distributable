@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modulith\Tests\Support;
 
-use Modulith\Contracts\Stream\Transport;
-use Modulith\Data\Envelope;
+use Microservices\Contracts\Stream\Transport;
+use Microservices\Data\Envelope;
 use RuntimeException;
 
 /** A broker that is down. */

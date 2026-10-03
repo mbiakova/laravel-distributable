@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Foundation\Iam\Services;
 
 use Foundation\Iam\Contracts\IamService;
-use Modulith\Services\Rpc\RpcService;
+use Microservices\Services\Rpc\RpcService;
 
 final class IamRpcService extends RpcService implements IamService
 {

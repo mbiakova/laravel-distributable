@@ -34,7 +34,9 @@ or start from it:
 composer create-project mk-josias/laravel-modulith-skeleton my-app
 ```
 
-Requires PHP 8.4+ and Laravel 12 or 13. The package has no other runtime dependency.
+Requires PHP 8.4+ and Laravel 12 or 13. Events, calls and copies between modules come from
+[laravel-microservices](https://github.com/mk-josias/laravel-microservices), which an application
+on its own can use too: each module is one of its services. There is no other runtime dependency.
 
 - [Why](#why)
 - [How it works](#how-it-works)
@@ -47,10 +49,10 @@ The rest of the documentation is in `docs/`:
 |---|---|
 | [Modules](docs/modules.md) | declaring a module, generating code in it, conventions, `modulith:doctor` |
 | [Each module's data](docs/databases.md) | connections, the module context, migrations, queued jobs |
-| [Events](docs/events.md) | the envelope, versioning, transports, the outbox, consuming |
-| [Calls between modules (RPC)](docs/rpc.md) | contracts, `RpcService`, the read-through cache |
+| [Events](docs/events.md) | what a module adds to laravel-microservices' events: its handlers, its outbox, its consumer |
+| [Calls between modules (RPC)](docs/rpc.md) | contracts and `RpcService` in the foundation, the direct call in one process |
 | [Read-only copies (shadows)](docs/shadows.md) | keeping another module's rows locally |
-| [Services in other languages](docs/other-languages.md) | how a non-PHP service emits and reads events, calls a module, answers one, and feeds a copy |
+| [Services in other languages](docs/other-languages.md) | a non-PHP service next to the modules |
 | [Configuration](docs/configuration.md) | every key of `config/modulith.php`, the source layout |
 
 ## Why
@@ -187,6 +189,8 @@ part of the package. A module without a repository breaks nothing, so repositori
 
 ### Extension points
 
+These come from laravel-microservices (`Microservices\` namespace):
+
 | Contract | Default | Replace it with |
 |---|---|---|
 | `Contracts\Stream\Transport`, the event stream | `redis`, `queue`, `array`, `null` | `TransportManager::extend()` |
@@ -196,7 +200,8 @@ part of the package. A module without a repository breaks nothing, so repositori
 | `Services\Rpc\RpcService`, a module's client in the other processes | none | a subclass in `foundation/{Module}/Services`, mapped in `FoundationServiceProvider::$rpc` |
 | `Models\ShadowModel`, a read-only copy | none | an abstract subclass in the owner's foundation, extended in each keeper |
 
-The package defines the envelope format, which is why transports can be swapped.
+laravel-microservices defines the envelope format, which is why transports can be swapped. This
+package binds its `Contracts\Colocation` to `ModuleColocation`, which makes each module a service.
 
 ### Working with other packages
 
@@ -273,7 +278,7 @@ apps/Iam/
 │   └── Events/UserRegistered.php
 ├── config/
 │   ├── database.php                  its connections; if the file exists, the module has a database
-│   └── modulith.php                  the events it listens to
+│   └── microservices.php             the events it listens to
 ├── database/migrations/
 └── routes/api.php                    served under /iam/api/…
 
@@ -315,7 +320,7 @@ php artisan migrate   # migrates the application's database, then each module's
 Emit an event from one module and handle it in another:
 
 ```php
-final class UserRegistered extends \Modulith\Events\Event
+final class UserRegistered extends \Microservices\Events\Event
 {
     public function __construct(private readonly int $id) {}
 
@@ -326,27 +331,27 @@ final class UserRegistered extends \Modulith\Events\Event
     public function version(): int { return 1; }   // raised when the shape of the payload changes
 }
 
-app(\Modulith\Contracts\Stream\Bus::class)->emit(new UserRegistered($user->id));
+app(\Microservices\Contracts\Stream\Bus::class)->emit(new UserRegistered($user->id));
 ```
 
 ```php
 // apps/Analytics/app/Handlers/RecordSignup.php
-final class RecordSignup implements \Modulith\Contracts\Stream\Handler
+final class RecordSignup implements \Microservices\Contracts\Stream\Handler
 {
     public function handle(string $name, array $payload): void { /* ... */ }
 }
 
-// apps/Analytics/config/modulith.php
+// apps/Analytics/config/microservices.php
 return ['events' => ['listen' => ['iam.user.registered' => [RecordSignup::class]]]];
 ```
 
 ```bash
-php artisan modulith:events:consume --module=analytics
+php artisan microservices:events:consume --module=analytics
 ```
 
 This event is version 1. When the shape of a payload changes, the event declares a new version and
 how to read the old ones, so events already in the stream stay readable: see
-[Versioning a payload](docs/events.md#versioning-a-payload).
+[Versioning a payload](https://github.com/mk-josias/laravel-microservices/blob/main/docs/events.md#versioning-a-payload).
 
 Then check that every module could run apart:
 

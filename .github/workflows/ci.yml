@@ -22,7 +22,15 @@ jobs:
         options: --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 5s --health-retries 5
 
     steps:
+      # composer.json reaches laravel-microservices through a path repository at ../laravel-microservices.
       - uses: actions/checkout@v4
+        with:
+          path: modular-monolith
+
+      - uses: actions/checkout@v4
+        with:
+          repository: mk-josias/laravel-microservices
+          path: laravel-microservices
 
       - uses: shivammathur/setup-php@v2
         with:
@@ -31,9 +39,11 @@ jobs:
           coverage: none
 
       - name: Install dependencies
+        working-directory: modular-monolith
         run: |
           composer require "laravel/framework:${{ matrix.laravel }}" --no-update --no-interaction
           composer update --with-all-dependencies --prefer-dist --no-progress --no-interaction
 
       - name: Pint, PHPStan, Pest
+        working-directory: modular-monolith
         run: composer check

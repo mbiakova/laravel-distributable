@@ -7,16 +7,16 @@ use Apps\Iam\Events\UserRenamed;
 use Apps\Iam\Support\Recorder;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
-use Modulith\Contracts\Stream\Bus;
-use Modulith\Contracts\Stream\Transport;
-use Modulith\Data\Envelope;
-use Modulith\Exceptions\ConfigurationException;
-use Modulith\Exceptions\ModuleException;
-use Modulith\Services\Modules\ModuleRegistry;
-use Modulith\Services\Stream\Dispatcher;
-use Modulith\Services\Stream\Outbox\Relay;
-use Modulith\Services\Stream\PayloadVersions;
-use Modulith\Services\Stream\TransportManager;
+use Microservices\Contracts\Stream\Bus;
+use Microservices\Contracts\Stream\Transport;
+use Microservices\Data\Envelope;
+use Microservices\Exceptions\ConfigurationException;
+use Microservices\Exceptions\ServiceException;
+use Microservices\Providers\MicroservicesServiceProvider;
+use Microservices\Services\Stream\Dispatcher;
+use Microservices\Services\Stream\Outbox\Relay;
+use Microservices\Services\Stream\PayloadVersions;
+use Microservices\Services\Stream\TransportManager;
 use Modulith\Tests\Support\ModuleAppTestCase;
 use Modulith\Tests\Support\RecordingTransport;
 
@@ -57,7 +57,7 @@ it('lifts an old payload one version at a time, so the handler only sees the cur
 it('refuses an envelope newer than this process reads, and runs no handler', function () {
     try {
         $this->app->make(Dispatcher::class)->dispatch(renamed(4, ['id' => 5]));
-    } catch (ModuleException $exception) {
+    } catch (ServiceException $exception) {
         expect($exception->getMessage())->toBe('Event [iam.user.renamed] arrived in version 4, and this process reads it up to version 3: deploy its consumer before it is handled.')
             ->and($this->app->make(Recorder::class)->records)->toBe([]);
 
@@ -76,25 +76,25 @@ it('reads an event nobody declared a version for as version 1 only', function ()
     $this->app->make(Dispatcher::class)->dispatch(
         new Envelope('00000000-0000-0000-0000-000000000009', 'iam', 'iam.user.registered', ['id' => 5], [], now()->toImmutable(), version: 2),
     );
-})->throws(ModuleException::class, 'arrived in version 2, and this process reads it up to version 1');
+})->throws(ServiceException::class, 'arrived in version 2, and this process reads it up to version 1');
 
 it('refuses a payload class that declares no version', function () {
     $this->app->make(PayloadVersions::class)->add(['iam.user.registered' => Recorder::class]);
-})->throws(ConfigurationException::class, 'must implement Modulith\Contracts\Stream\Versioned');
+})->throws(ConfigurationException::class, 'must implement Microservices\Contracts\Stream\Versioned');
 
 it('keeps the version through the outbox', function () {
-    Config::set('modulith.events.streams.default.outbox', true);
-    Config::set('modulith.events.streams.default.driver', 'recording');
+    Config::set('microservices.events.streams.default.outbox', true);
+    Config::set('microservices.events.streams.default.driver', 'recording');
     $this->app->instance(RecordingTransport::class, new RecordingTransport);
     $this->app->make(TransportManager::class)->extend('recording', fn ($app): Transport => $app->make(RecordingTransport::class));
     Config::set('database.default', 'iam');
 
-    foreach (glob(dirname(__DIR__, 2).'/database/migrations/*.php') as $file) {
+    foreach (glob(dirname((string) (new ReflectionClass(MicroservicesServiceProvider::class))->getFileName(), 3).'/database/migrations/*.php') as $file) {
         (require $file)->up();
     }
 
     $this->app->make(Bus::class)->emit(new UserRenamed(5, 'Ada Lovelace'));
-    $this->app->make(Relay::class)->drain($this->app->make(ModuleRegistry::class)->get('iam'));
+    $this->app->make(Relay::class)->drain('iam');
 
     expect((int) DB::connection('iam')->table('event_publications')->value('version'))->toBe(3)
         ->and($this->app->make(RecordingTransport::class)->published[0]->version)->toBe(3);

@@ -7,8 +7,8 @@ namespace Apps\Iam\Models;
 use Apps\Iam\Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Modulith\Contracts\Shadows\Shadowed;
-use Modulith\Traits\ShadowSource;
+use Microservices\Contracts\Shadows\Shadowed;
+use Microservices\Traits\ShadowSource;
 
 final class User extends Model implements Shadowed
 {

@@ -37,17 +37,17 @@ it('migrates the copy into the keeper database, named after the keeper', functio
 
 it('keeps the copy in step with the source, deletion included', function () {
     $user = $this->inModule('iam', fn () => User::query()->create(['name' => 'ada']));
-    $this->artisan('modulith:events:consume --module=analytics')->assertSuccessful();
+    $this->artisan('microservices:events:consume --module=analytics')->assertSuccessful();
 
     expect(copies()->where('id', $user->id)->value('name'))->toBe('ada');
 
     $user->update(['name' => 'grace']);
-    $this->artisan('modulith:events:consume --module=analytics')->assertSuccessful();
+    $this->artisan('microservices:events:consume --module=analytics')->assertSuccessful();
 
     expect(copies()->where('id', $user->id)->value('name'))->toBe('grace');
 
     $user->delete();
-    $this->artisan('modulith:events:consume --module=analytics')->assertSuccessful();
+    $this->artisan('microservices:events:consume --module=analytics')->assertSuccessful();
 
     expect(copies()->where('id', $user->id)->value('deleted_at'))->not->toBeNull();
 });
@@ -55,21 +55,21 @@ it('keeps the copy in step with the source, deletion included', function () {
 it('leaves the copies of analytics to the analytics consumer, when one process runs both modules', function () {
     $user = $this->inModule('iam', fn () => User::query()->create(['name' => 'ada']));
 
-    $this->artisan('modulith:events:consume --module=iam')->assertSuccessful();
+    $this->artisan('microservices:events:consume --module=iam')->assertSuccessful();
 
     expect(copies()->count())->toBe(0);
 
-    $this->artisan('modulith:events:consume --module=analytics')->assertSuccessful();
+    $this->artisan('microservices:events:consume --module=analytics')->assertSuccessful();
 
     expect(copies()->where('id', $user->id)->value('name'))->toBe('ada');
 });
 
 it('fills a copy from the announcement alone, so a service in another language can be its source', function () {
-    $this->receive('analytics', 'modulith.shadow.changed', ['source' => 'iam_users', 'key' => 7, 'attributes' => ['name' => 'linus']]);
+    $this->receive('analytics', 'microservices.shadow.changed', ['source' => 'iam_users', 'key' => 7, 'attributes' => ['name' => 'linus']]);
 
     expect(copies()->where('id', 7)->value('name'))->toBe('linus');
 
-    $this->receive('analytics', 'modulith.shadow.changed', ['source' => 'iam_users', 'key' => 7, 'attributes' => ['name' => 'linus', 'deleted_at' => '2026-10-02 10:00:00']]);
+    $this->receive('analytics', 'microservices.shadow.changed', ['source' => 'iam_users', 'key' => 7, 'attributes' => ['name' => 'linus', 'deleted_at' => '2026-10-02 10:00:00']]);
 
     expect(copies()->where('id', 7)->value('deleted_at'))->not->toBeNull();
 });
@@ -81,16 +81,16 @@ it('refuses any write to a copy that does not come from the source', function ()
 
 it('leaves a copy alone when the announcement is addressed to another keeper', function () {
     $user = $this->inModule('iam', fn () => User::query()->create(['name' => 'ada']));
-    $this->artisan('modulith:events:consume --module=analytics')->assertSuccessful();
+    $this->artisan('microservices:events:consume --module=analytics')->assertSuccessful();
     DB::connection('iam')->table('iam_users')->where('id', $user->id)->update(['name' => 'grace']);
 
-    $this->artisan('modulith:shadows:announce iam_users --keepers=gateway')->assertSuccessful();
-    $this->artisan('modulith:events:consume --module=analytics')->assertSuccessful();
+    $this->artisan('microservices:shadows:announce iam_users --keepers=gateway')->assertSuccessful();
+    $this->artisan('microservices:events:consume --module=analytics')->assertSuccessful();
 
     expect(copies()->where('id', $user->id)->value('name'))->toBe('ada');
 
-    $this->artisan('modulith:shadows:announce iam_users --keepers=analytics')->assertSuccessful();
-    $this->artisan('modulith:events:consume --module=analytics')->assertSuccessful();
+    $this->artisan('microservices:shadows:announce iam_users --keepers=analytics')->assertSuccessful();
+    $this->artisan('microservices:events:consume --module=analytics')->assertSuccessful();
 
     expect(copies()->where('id', $user->id)->value('name'))->toBe('grace');
 });
@@ -99,19 +99,19 @@ it('rebuilds a copy on demand: the keeper asks, the owner announces again', func
     $user = $this->inModule('iam', fn () => User::query()->create(['name' => 'ada']));
     copies()->delete();
 
-    $this->artisan('modulith:shadows:want')->assertSuccessful();
-    $this->artisan('modulith:events:consume --module=iam')->assertSuccessful();
-    $this->artisan('modulith:events:consume --module=analytics')->assertSuccessful();
+    $this->artisan('microservices:shadows:want')->assertSuccessful();
+    $this->artisan('microservices:events:consume --module=iam')->assertSuccessful();
+    $this->artisan('microservices:events:consume --module=analytics')->assertSuccessful();
 
     expect(copies()->where('id', $user->id)->value('name'))->toBe('ada');
 });
 
 it('asks only for the keepers and sources named', function () {
-    $this->artisan('modulith:shadows:want --keepers=gateway')->doesntExpectOutputToContain('wants')->assertSuccessful();
+    $this->artisan('microservices:shadows:want --keepers=gateway')->doesntExpectOutputToContain('wants')->assertSuccessful();
 
-    $this->artisan('modulith:shadows:want --keepers=analytics --sources=iam_users')
+    $this->artisan('microservices:shadows:want --keepers=analytics --sources=iam_users')
         ->expectsOutput('→ analytics wants iam_users')
         ->assertSuccessful();
 
-    $this->artisan('modulith:shadows:want --sources=other_table')->doesntExpectOutputToContain('wants')->assertSuccessful();
+    $this->artisan('microservices:shadows:want --sources=other_table')->doesntExpectOutputToContain('wants')->assertSuccessful();
 });

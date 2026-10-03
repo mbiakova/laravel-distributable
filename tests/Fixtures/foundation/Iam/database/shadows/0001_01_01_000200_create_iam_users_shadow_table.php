@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use Modulith\Migrations\ShadowMigration;
+use Microservices\Migrations\ShadowMigration;
 
 return new class extends ShadowMigration
 {

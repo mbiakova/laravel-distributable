@@ -8,11 +8,11 @@ use Closure;
 use Illuminate\Foundation\Testing\WithConsoleEvents;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
-use Modulith\Data\Envelope;
+use Microservices\Data\Envelope;
+use Microservices\Services\Stream\Dispatcher;
 use Modulith\Exceptions\ModuleException;
 use Modulith\Services\Modules\ModuleContext;
 use Modulith\Services\Modules\ModuleRegistry;
-use Modulith\Services\Stream\Dispatcher;
 use PHPUnit\Framework\Assert;
 use ReflectionFunction;
 
@@ -66,7 +66,7 @@ trait InteractsWithModules
             version: $version,
         );
 
-        $this->app->make(Dispatcher::class)->dispatch($envelope, $this->app->make(ModuleRegistry::class)->get($module));
+        $this->app->make(Dispatcher::class)->dispatch($envelope, $this->app->make(ModuleRegistry::class)->get($module)->name);
     }
 
     /** Event::assertListening() for a listener a module declares in $listen, which Laravel only sees as a closure. */

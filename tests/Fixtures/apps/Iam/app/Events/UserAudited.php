@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Apps\Iam\Events;
 
-use Modulith\Events\Event;
+use Microservices\Events\Event;
 
-/** Travels on the `audit` stream the module declares in its config/modulith.php. */
+/** Travels on the `audit` stream the module declares in its config/microservices.php. */
 final class UserAudited extends Event
 {
     public function __construct(private readonly int $id) {}

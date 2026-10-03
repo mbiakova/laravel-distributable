@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Foundation\Iam\Shadows;
 
-use Modulith\Models\ShadowModel;
+use Microservices\Models\ShadowModel;
 
 /** The shape of a copy of iam's users, declared once by iam for every module that keeps one. */
 abstract class UserShadow extends ShadowModel

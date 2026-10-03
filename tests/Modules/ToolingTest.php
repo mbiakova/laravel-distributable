@@ -157,22 +157,11 @@ it('fails on a module folder that modulith.modules does not declare', function (
 });
 
 it('fails when modules serve RPC contracts and no secret signs the calls', function () {
-    config()->set('modulith.rpc.secret', '');
+    config()->set('microservices.rpc.secret', '');
 
     $this->artisan('modulith:doctor')
-        ->expectsOutputToContain('modulith.rpc.secret is empty')
+        ->expectsOutputToContain('microservices.rpc.secret is empty')
         ->assertFailed();
-});
-
-it('falls back to the application key for the RPC secret', function () {
-    putenv('MODULITH_RPC_SECRET');
-    putenv('APP_KEY=app-key-value');
-
-    try {
-        expect((require dirname(__DIR__, 2).'/config/modulith.php')['rpc']['secret'])->toBe('app-key-value');
-    } finally {
-        putenv('APP_KEY');
-    }
 });
 
 it('fails on two modules setting one config key to different values, and leaves lists alone', function () {

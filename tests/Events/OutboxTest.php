@@ -8,13 +8,13 @@ use Apps\Iam\Support\Recorder;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
-use Modulith\Contracts\Stream\Bus;
-use Modulith\Contracts\Stream\Transport;
-use Modulith\Data\Envelope;
-use Modulith\Exceptions\ConfigurationException;
-use Modulith\Services\Modules\ModuleRegistry;
-use Modulith\Services\Stream\Outbox\Relay;
-use Modulith\Services\Stream\TransportManager;
+use Microservices\Contracts\Stream\Bus;
+use Microservices\Contracts\Stream\Transport;
+use Microservices\Data\Envelope;
+use Microservices\Exceptions\ConfigurationException;
+use Microservices\Providers\MicroservicesServiceProvider;
+use Microservices\Services\Stream\Outbox\Relay;
+use Microservices\Services\Stream\TransportManager;
 use Modulith\Tests\Support\ExplodingTransport;
 use Modulith\Tests\Support\ModuleAppTestCase;
 use Modulith\Tests\Support\RecordingTransport;
@@ -23,8 +23,8 @@ use Modulith\Tests\Support\TrackingTransport;
 uses(ModuleAppTestCase::class);
 
 beforeEach(function () {
-    Config::set('modulith.events.streams.default.outbox', true);
-    Config::set('modulith.events.streams.default.driver', 'recording');
+    Config::set('microservices.events.streams.default.outbox', true);
+    Config::set('microservices.events.streams.default.driver', 'recording');
 
     $this->app->instance(RecordingTransport::class, new RecordingTransport);
     $this->app->make(TransportManager::class)->extend(
@@ -38,9 +38,9 @@ beforeEach(function () {
 
     $this->app->singleton(Recorder::class);
 
-    // The kernel's own infra migrations, on the iam module's database.
+    // laravel-microservices' outbox migrations, on the iam module's database.
     Config::set('database.default', 'iam');
-    foreach (glob(dirname(__DIR__, 2).'/database/migrations/*.php') as $file) {
+    foreach (glob(dirname((string) (new ReflectionClass(MicroservicesServiceProvider::class))->getFileName(), 3).'/database/migrations/*.php') as $file) {
         (require $file)->up();
     }
 });
@@ -101,7 +101,7 @@ it('publishes pending rows in emission order', function () {
     $this->app->make(Bus::class)->emit(new UserRegistered(1, 'first'));
     $this->app->make(Bus::class)->emit(new UserRegistered(2, 'second'));
 
-    $published = $this->app->make(Relay::class)->drain($this->app->make(ModuleRegistry::class)->get('iam'));
+    $published = $this->app->make(Relay::class)->drain('iam');
 
     expect($published)->toBe(2)
         ->and(array_map(fn (Envelope $e) => $e->payload['id'], $this->app->make(RecordingTransport::class)->published))->toBe([1, 2])
@@ -121,19 +121,19 @@ it('sweeps every local module database from the command', function () {
         'stream' => 'default',
     ]);
 
-    $this->artisan('modulith:events:publish --once --module=iam')->assertSuccessful();
+    $this->artisan('microservices:events:publish --once --module=iam')->assertSuccessful();
 
     expect($this->app->make(RecordingTransport::class)->published)->toHaveCount(1)
         ->and(publications()->first()->published_at)->not->toBeNull();
 });
 
 it('stops the pass at the first failure so no later row overtakes it', function () {
-    Config::set('modulith.events.streams.default.driver', 'exploding');
+    Config::set('microservices.events.streams.default.driver', 'exploding');
 
     $this->app->make(Bus::class)->emit(new UserRegistered(1, 'first'));
     $this->app->make(Bus::class)->emit(new UserRegistered(2, 'second'));
 
-    $published = $this->app->make(Relay::class)->drain($this->app->make(ModuleRegistry::class)->get('iam'));
+    $published = $this->app->make(Relay::class)->drain('iam');
 
     [$first, $second] = publications()->orderBy('sequence')->get()->all();
 
@@ -145,13 +145,13 @@ it('stops the pass at the first failure so no later row overtakes it', function 
 
 it('requeues published rows to rebuild an emptied stream', function () {
     $this->app->make(Bus::class)->emit(new UserRegistered(5, 'lamp'));
-    $this->artisan('modulith:events:publish --once --module=iam')->assertSuccessful();
+    $this->artisan('microservices:events:publish --once --module=iam')->assertSuccessful();
 
-    $this->artisan('modulith:events:republish --force --module=iam')->assertSuccessful();
+    $this->artisan('microservices:events:republish --force --module=iam')->assertSuccessful();
 
     expect(publications()->first()->published_at)->toBeNull();
 
-    $this->artisan('modulith:events:publish --once --module=iam')->assertSuccessful();
+    $this->artisan('microservices:events:publish --once --module=iam')->assertSuccessful();
 
     expect($this->app->make(RecordingTransport::class)->published)->toHaveCount(2);
 });
@@ -161,10 +161,10 @@ it('exports only the rows matching a property of the payload', function () {
 
     $this->app->make(Bus::class)->emit(new UserRegistered(1, 'keep'));
     $this->app->make(Bus::class)->emit(new UserRegistered(2, 'leave'));
-    $this->artisan('modulith:events:publish --once --module=iam')->assertSuccessful();
+    $this->artisan('microservices:events:publish --once --module=iam')->assertSuccessful();
 
     try {
-        $this->artisan("modulith:events:export {$path} --module=iam --where=payload.name=keep")->assertSuccessful();
+        $this->artisan("microservices:events:export {$path} --module=iam --where=payload.name=keep")->assertSuccessful();
 
         expect(array_map(fn (string $line) => json_decode($line, true)['payload'], file($path)))->toBe(['{"id":1,"name":"keep"}'])
             ->and(publications()->pluck('payload')->all())->toBe(['{"id":2,"name":"leave"}']);
@@ -177,16 +177,16 @@ it('exports only what every consumer acknowledged, stopping at the first row not
     $path = tempnam(sys_get_temp_dir(), 'modulith-export-');
     $tracking = new TrackingTransport;
     $this->app->make(TransportManager::class)->extend('tracking', fn (): Transport => $tracking);
-    Config::set('modulith.events.streams.default.driver', 'tracking');
+    Config::set('microservices.events.streams.default.driver', 'tracking');
 
     foreach ([1, 2, 3] as $id) {
         $this->app->make(Bus::class)->emit(new UserRegistered($id, "user-{$id}"));
     }
-    $this->artisan('modulith:events:publish --once --module=iam')->assertSuccessful();
+    $this->artisan('microservices:events:publish --once --module=iam')->assertSuccessful();
     $tracking->acknowledgedUpTo = 2;
 
     try {
-        $this->artisan("modulith:events:export {$path} --module=iam --acknowledged --batch=1")->assertSuccessful();
+        $this->artisan("microservices:events:export {$path} --module=iam --acknowledged --batch=1")->assertSuccessful();
 
         expect(count(file($path)))->toBe(2)
             ->and(publications()->pluck('stream_id')->all())->toBe(['3-0']);
@@ -197,9 +197,9 @@ it('exports only what every consumer acknowledged, stopping at the first row not
 
 it('refuses --acknowledged on a transport that does not know who read what', function () {
     $this->app->make(Bus::class)->emit(new UserRegistered(1, 'a'));
-    $this->artisan('modulith:events:publish --once --module=iam')->assertSuccessful();
+    $this->artisan('microservices:events:publish --once --module=iam')->assertSuccessful();
 
-    $this->artisan('modulith:events:export '.sys_get_temp_dir().'/modulith-refused.jsonl --module=iam --acknowledged');
+    $this->artisan('microservices:events:export '.sys_get_temp_dir().'/modulith-refused.jsonl --module=iam --acknowledged');
 })->throws(ConfigurationException::class, 'does not know who acknowledged what');
 
 it('moves published rows to a file, in batches, and replays them from it', function () {
@@ -212,12 +212,12 @@ it('moves published rows to a file, in batches, and replays them from it', funct
     publications()->where('name', 'iam.user.registered')->whereIn('payload', ['{"id":1,"name":"user-1"}', '{"id":2,"name":"user-2"}', '{"id":3,"name":"user-3"}'])->update(['published_at' => now()]);
 
     try {
-        $this->artisan("modulith:events:export {$path} --module=iam --batch=2")->assertSuccessful();
+        $this->artisan("microservices:events:export {$path} --module=iam --batch=2")->assertSuccessful();
 
         expect(count(file($path)))->toBe(3)
             ->and(publications()->count())->toBe(1);
 
-        $this->artisan("modulith:events:import {$path} --batch=2")->assertSuccessful();
+        $this->artisan("microservices:events:import {$path} --batch=2")->assertSuccessful();
 
         expect(publications()->whereNull('published_at')->orderBy('sequence')->pluck('payload')->map(fn ($p) => json_decode($p, true)['id'])->all())
             ->toBe([4, 1, 2, 3]);

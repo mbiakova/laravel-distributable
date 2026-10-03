@@ -7,7 +7,7 @@ namespace Apps\Iam\Handlers;
 use Apps\Iam\Support\Recorder;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\DB;
-use Modulith\Contracts\Stream\Handler;
+use Microservices\Contracts\Stream\Handler;
 
 final class OnUserRegistered implements Handler
 {

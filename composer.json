@@ -20,7 +20,20 @@
     ],
     "require": {
         "php": "^8.4",
-        "laravel/framework": "^12.0 || ^13.0"
+        "laravel/framework": "^12.0 || ^13.0",
+        "mk-josias/laravel-microservices": "^0.1"
+    },
+    "repositories": {
+        "microservices": {
+            "type": "path",
+            "url": "../laravel-microservices",
+            "options": {
+                "symlink": true,
+                "versions": {
+                    "mk-josias/laravel-microservices": "0.1.0"
+                }
+            }
+        }
     },
     "require-dev": {
         "larastan/larastan": "^3.10",
@@ -30,16 +43,12 @@
         "pestphp/pest": "^3.0 || ^4.0"
     },
     "suggest": {
-        "ext-redis": "Required by the redis events transport (predis/predis works too)",
         "laravel/octane": "High-throughput application server; the kernel also runs under plain FPM"
     },
     "autoload": {
         "psr-4": {
             "Modulith\\": "src/"
-        },
-        "files": [
-            "src/helpers.php"
-        ]
+        }
     },
     "autoload-dev": {
         "psr-4": {

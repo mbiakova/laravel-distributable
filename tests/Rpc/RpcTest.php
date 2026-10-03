@@ -12,15 +12,14 @@ use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
-use Modulith\Contracts\Rpc\RpcTransport;
-use Modulith\Data\Module;
-use Modulith\Exceptions\ConfigurationException;
-use Modulith\Exceptions\ModuleException;
+use Microservices\Contracts\Rpc\RpcTransport;
+use Microservices\Exceptions\ConfigurationException;
+use Microservices\Exceptions\ServiceException;
+use Microservices\Services\Rpc\RpcSignature;
+use Microservices\Services\Rpc\RpcTransportManager;
+use Microservices\Transports\Rpc\HttpRpcTransport;
 use Modulith\Services\Modules\ModuleRegistry;
-use Modulith\Services\Rpc\RpcSignature;
-use Modulith\Services\Rpc\RpcTransportManager;
 use Modulith\Tests\Support\ModuleAppTestCase;
-use Modulith\Transports\Rpc\HttpRpcTransport;
 
 uses(ModuleAppTestCase::class);
 
@@ -84,8 +83,8 @@ it('runs DB:: queries and a DB::transaction() of the local call on iam database,
 });
 
 it('only calls a method of a contract the module implements', function () {
-    app(RpcTransport::class)->invoke(app(ModuleRegistry::class)->get('iam'), IamService::class, 'shutdown');
-})->throws(ModuleException::class, 'answers no [Foundation\Iam\Contracts\IamService::shutdown()]');
+    app(RpcTransport::class)->invoke('iam', IamService::class, 'shutdown');
+})->throws(ServiceException::class, 'answers no [Foundation\Iam\Contracts\IamService::shutdown()]');
 
 it('rejects an unsigned call', function () {
     $this->postJson('/iam/rpc/findUser', rpcBody(IamService::class, ['id' => 1]))->assertForbidden();
@@ -109,7 +108,7 @@ it('answers a method or a contract the module does not serve with a 400, not a f
     foreach (['/iam/rpc/doesNotExist' => rpcBody(IamService::class), '/iam/rpc/findUser' => rpcBody('Foundation\Iam\Contracts\Unknown')] as $path => $body) {
         $this->postJson($path, $body, signedRpcHeaders($path, $body))
             ->assertStatus(400)
-            ->assertJsonPath('message', fn (string $message): bool => str_contains($message, 'Module [iam] answers no'));
+            ->assertJsonPath('message', fn (string $message): bool => str_contains($message, 'Service [iam] answers no'));
     }
 });
 
@@ -150,11 +149,11 @@ it('rejects a context changed after signing', function () {
 });
 
 it('sends a signed POST naming the contract and the method, and decodes the answer', function () {
-    config()->set('modulith.events.propagate', ['trace_id']);
+    config()->set('microservices.events.propagate', ['trace_id']);
     Context::add('trace_id', 'abc');
     Http::fake(['iam.test/*' => Http::response(['id' => 1, 'name' => 'ada'])]);
 
-    $answer = app(HttpRpcTransport::class)->invoke(app(ModuleRegistry::class)->get('iam'), IamService::class, 'findUser', ['id' => 1]);
+    $answer = app(HttpRpcTransport::class)->invoke('iam', IamService::class, 'findUser', ['id' => 1]);
 
     expect($answer)->toBe(['id' => 1, 'name' => 'ada']);
 
@@ -176,7 +175,7 @@ it('reaches iam over HTTP once iam runs elsewhere', function () {
     iamRunsElsewhere();
     Http::fake(['iam.test/iam/rpc/findUser' => Http::response(['id' => 1, 'name' => 'ada'])]);
 
-    expect(app(RpcTransport::class)->invoke(app(ModuleRegistry::class)->get('iam'), IamService::class, 'findUser', ['id' => 1]))
+    expect(app(RpcTransport::class)->invoke('iam', IamService::class, 'findUser', ['id' => 1]))
         ->toBe(['id' => 1, 'name' => 'ada']);
 
     Http::assertSentCount(1);
@@ -186,7 +185,7 @@ it('reads a missing remote record as null', function () {
     iamRunsElsewhere();
     Http::fake(['iam.test/*' => Http::response(null, 404)]);
 
-    expect(app(RpcTransport::class)->invoke(app(ModuleRegistry::class)->get('iam'), IamService::class, 'findUser', ['id' => 9]))->toBeNull();
+    expect(app(RpcTransport::class)->invoke('iam', IamService::class, 'findUser', ['id' => 9]))->toBeNull();
 });
 
 it('caches a remote answer for as long as the answer says, and forgets it on demand', function () {
@@ -210,9 +209,9 @@ it('keeps the raw answer and maps it on every read, dropping one that no longer 
         ->and(Cache::get('iam:shaped'))->toBe(['id' => 7]);
 });
 
-it('keeps the answers in the store modulith.rpc.cache names, shared by the caller and the owner', function () {
+it('keeps the answers in the store microservices.rpc.cache names, shared by the caller and the owner', function () {
     config()->set('cache.stores.rpc', ['driver' => 'array']);
-    config()->set('modulith.rpc.cache', 'rpc');
+    config()->set('microservices.rpc.cache', 'rpc');
 
     app(IamRpcService::class)->findUser(1);
 
@@ -222,27 +221,27 @@ it('keeps the answers in the store modulith.rpc.cache names, shared by the calle
 
 it('routes a call to the transport its module host names, registered with extend()', function () {
     iamRunsElsewhere();
-    config()->set('modulith.rpc.transports.grpc', ['driver' => 'grpc', 'port' => 50051]);
-    config()->set('modulith.modules.iam.host', ['url' => 'grpc://iam', 'transport' => 'grpc']);
+    config()->set('microservices.rpc.transports.grpc', ['driver' => 'grpc', 'port' => 50051]);
+    config()->set('microservices.services.iam.host', ['url' => 'grpc://iam', 'transport' => 'grpc']);
 
     app(RpcTransportManager::class)->extend('grpc', fn ($app, array $config): RpcTransport => new class($config) implements RpcTransport
     {
         /** @param array<string, mixed> $config */
         public function __construct(private array $config) {}
 
-        public function invoke(Module $module, string $contract, string $method, array $arguments = []): mixed
+        public function invoke(string $service, string $contract, string $method, array $arguments = []): mixed
         {
-            return ['via' => 'grpc', 'port' => $this->config['port'], 'call' => "{$module->name}/".class_basename($contract)."::{$method}"];
+            return ['via' => 'grpc', 'port' => $this->config['port'], 'call' => "{$service}/".class_basename($contract)."::{$method}"];
         }
     });
 
-    expect(app(RpcTransport::class)->invoke(app(ModuleRegistry::class)->get('iam'), IamService::class, 'findUser'))
+    expect(app(RpcTransport::class)->invoke('iam', IamService::class, 'findUser'))
         ->toBe(['via' => 'grpc', 'port' => 50051, 'call' => 'iam/IamService::findUser']);
 });
 
 it('fails loudly on an RPC transport nobody declared', function () {
     iamRunsElsewhere();
-    config()->set('modulith.modules.iam.host', ['url' => 'x', 'transport' => 'amqp']);
+    config()->set('microservices.services.iam.host', ['url' => 'x', 'transport' => 'amqp']);
 
-    app(RpcTransport::class)->invoke(app(ModuleRegistry::class)->get('iam'), IamService::class, 'findUser');
+    app(RpcTransport::class)->invoke('iam', IamService::class, 'findUser');
 })->throws(ConfigurationException::class, 'RPC transport [amqp] is not declared');

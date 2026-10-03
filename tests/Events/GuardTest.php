@@ -7,18 +7,19 @@ use Apps\Iam\Handlers\OnUserRegistered;
 use Apps\Iam\Support\Recorder;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
-use Modulith\Data\Envelope;
-use Modulith\Services\Stream\Dispatcher;
+use Microservices\Data\Envelope;
+use Microservices\Providers\MicroservicesServiceProvider;
+use Microservices\Services\Stream\Dispatcher;
 use Modulith\Tests\Support\ModuleAppTestCase;
 
 uses(ModuleAppTestCase::class);
 
 beforeEach(function () {
     $this->app->singleton(Recorder::class);
-    Config::set('modulith.events.guard', true);
+    Config::set('microservices.events.guard', true);
 
     Config::set('database.default', 'iam');
-    foreach (glob(dirname(__DIR__, 2).'/database/migrations/*.php') as $file) {
+    foreach (glob(dirname((string) (new ReflectionClass(MicroservicesServiceProvider::class))->getFileName(), 3).'/database/migrations/*.php') as $file) {
         (require $file)->up();
     }
 });
@@ -35,7 +36,7 @@ it('runs a handler once and turns the redelivery into a no-op', function () {
 });
 
 it('marks per handler, not per event', function () {
-    Config::set('modulith.events.listen', [
+    Config::set('microservices.events.listen', [
         'iam.user.registered' => [OnUserRegistered::class, OnUserRegistered::class],
     ]);
 
@@ -57,16 +58,16 @@ it('leaves no mark when the handler fails, so the event is replayed', function (
 });
 
 it('stays off when delivery is exactly-once', function () {
-    Config::set('modulith.events.guard', null);
-    Config::set('modulith.events.streams.default.outbox', false);
-    Config::set('modulith.events.streams.default.driver', 'array');
+    Config::set('microservices.events.guard', null);
+    Config::set('microservices.events.streams.default.outbox', false);
+    Config::set('microservices.events.streams.default.driver', 'array');
 
     expect($this->app->make(Dispatcher::class)->guarded())->toBeFalse();
 });
 
 it('turns itself on when the outbox is on', function () {
-    Config::set('modulith.events.guard', null);
-    Config::set('modulith.events.streams.default.outbox', true);
+    Config::set('microservices.events.guard', null);
+    Config::set('microservices.events.streams.default.outbox', true);
 
     expect($this->app->make(Dispatcher::class)->guarded())->toBeTrue();
 });

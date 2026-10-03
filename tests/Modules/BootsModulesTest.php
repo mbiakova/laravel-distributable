@@ -41,7 +41,7 @@ it('serves the RPC endpoint of each local module inside the signed rpc group', f
     $route = $this->app->make(Router::class)->getRoutes()->match(Request::create('/iam/rpc/findUser', 'POST'));
 
     expect($route->gatherMiddleware())->toContain('rpc')
-        ->and($route->defaults['module'])->toBe('iam');
+        ->and($route->defaults['service'])->toBe('iam');
 });
 
 it('deep-merges the module config over the root config', function () {

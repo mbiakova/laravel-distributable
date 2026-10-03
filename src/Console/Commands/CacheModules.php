@@ -6,10 +6,10 @@ namespace Modulith\Console\Commands;
 
 use Composer\Autoload\ClassLoader;
 use Illuminate\Console\Command;
+use Microservices\Services\Shadows\ShadowRegistry;
 use Modulith\Data\Module;
 use Modulith\Services\Modules\DiscoveryCache;
 use Modulith\Services\Modules\ModuleRegistry;
-use Modulith\Services\Shadows\ShadowRegistry;
 
 /** Run on deploy (php artisan optimize runs it): what the module folders tell is read from a file. */
 final class CacheModules extends Command
@@ -27,8 +27,8 @@ final class CacheModules extends Command
 
         $cache->write([
             'modules' => array_map(static fn (Module $module): array => $module->toArray(), $registry->all()),
-            'shadows' => array_combine($names, array_map($shadows->scanShadows(...), $local)),
-            'sources' => array_combine($names, array_map($shadows->scanSources(...), $local)),
+            'shadows' => array_combine($names, array_map($shadows->scanShadows(...), $names)),
+            'sources' => array_combine($names, array_map($shadows->scanSources(...), $names)),
         ]);
 
         $this->components->info('Modules cached: '.count($registry->all()).'.');

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Apps\Iam\Events;
 
-use Modulith\Events\Event;
+use Microservices\Events\Event;
 
 final class UserRegistered extends Event
 {
