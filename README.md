@@ -1,10 +1,9 @@
 # Laravel Modulith
 
-Laravel Modulith is for building a Laravel application as distributed modules. Each module has its
-own database and talks to the other modules only through events and RPC calls. You can run all the modules in one
-process, or move some of them to their own process by setting `MODULITH_RUNS`. The image of that
-process can then be built without the code of the other modules (`modulith:purge`), like an
-independent microservice. The code doesn't change.
+Laravel Modulith makes your Laravel modules microservices: each owns its database and talks to the
+others only through events and contracts. Run them as one application, or split them apart
+whenever you want, by setting `MODULITH_RUNS`. The image of a process can then be built without
+the code of the modules it doesn't run (`modulith:purge`). The code doesn't change.
 
 ```bash
 composer require mk-josias/laravel-modulith
@@ -119,10 +118,51 @@ When the application boots, the package:
 A module that runs in another process has no config, routes or handlers here. Only its RPC
 contracts are bound.
 
-Each request, job, command and event handler runs in the context of the module it belongs to, and
-that module's database connection becomes the default one ([details](docs/databases.md#models-and-transactions)).
+### The module context
+
+Several modules can share a process, each with its own database, and their code is plain Laravel:
+`User::query()`, `DB::transaction()`, no connection named anywhere. What makes this work is the
+module context: before any module's code runs, the package makes that module's connection
+Laravel's default one, and puts the previous one back afterwards.
+
+```
+request on /analytics/…        database.default = analytics
+  └─ calls IamService::findUser()
+       └─ iam's code runs      database.default = iam          the query lands in iam's database
+  └─ back in analytics         database.default = analytics
+outside any module             database.default = the application's connection
+```
+
+The switch happens at every way into a module's code, so nothing has to ask for it:
+
+| A module's code is entered by | The module is |
+|---|---|
+| a request on one of its routes | the route's, or the controller's |
+| a job, a command, an event handler, a listener it declares | the one the class belongs to |
+| an RPC call, from this process or another | the one that implements the contract |
+| work deferred or sent to another worker (`defer()`, `Concurrency`, Octane tasks, queued closures) | the one that started it |
+
+The current module also travels in Laravel's `Context`, which is how it follows a job to its
+worker. `ModuleContext::within($module, $callback)` does the same switch by hand, and
+`inModule()` in tests. The full table of entry points is in
+[Models and transactions](docs/databases.md#models-and-transactions).
 
 ## Design
+
+### The charter
+
+Each module is a microservice from its first line of code, and the package holds it to that, even
+while it shares a process with the others.
+
+| A microservice | How the package holds a module to it |
+|---|---|
+| owns its data | its own database and connections; naming another module's tables or connection is reported |
+| exposes only a contract | another module's classes can't be loaded where that module doesn't run, and importing them is reported |
+| talks through messages | events on a stream, or signed RPC calls on a contract, whether the modules share a process or not |
+| is deployed on its own | `MODULITH_RUNS` picks the modules a process runs; `modulith:purge` removes the others' code from its image |
+
+`modulith:doctor` and `Boundaries` check all of this in CI, so a module that would not survive
+being moved to its own service fails before it is deployed.
 
 ### What the package includes
 
@@ -193,7 +233,7 @@ under one cache key, such as spatie/laravel-permission: keep it in one module.
 
 | | nwidart/laravel-modules | Spring Modulith | laravel-modulith |
 |---|---|---|---|
-| Built for | organising code in modules | module boundaries and events inside one application | distributed modules: one codebase, deployed together or apart |
+| Built for | organising code in modules | module boundaries and events inside one application | modules that are microservices: one codebase, deployed together or apart |
 | Data | one shared database | one datasource | one database per module |
 | Between modules | direct calls | events and outbox | event stream with an ordered outbox, and RPC |
 | Moving a module to its own service | rewrite | new application | `MODULITH_RUNS` |
@@ -271,6 +311,8 @@ final class UserRegistered extends \Modulith\Events\Event
     public function name(): string { return 'iam.user.registered'; }
 
     public function payload(): array { return ['id' => $this->id]; }
+
+    public function version(): int { return 1; }   // raised when the shape of the payload changes
 }
 
 app(\Modulith\Contracts\Stream\Bus::class)->emit(new UserRegistered($user->id));

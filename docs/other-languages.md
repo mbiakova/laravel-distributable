@@ -92,7 +92,10 @@ The service then announces each change with a `modulith.shadow.changed` event:
   "name": "modulith.shadow.changed",
   "payload": { "source": "users", "key": 42, "attributes": { "name": "Ada" } },
   "headers": {},
-  "emitted_at": "2026-09-30T13:22:41.512000Z"
+  "emitted_at": "2026-09-30T13:22:41.512000Z",
+  "recipients": [],
+  "stream": "default",
+  "version": 1
 }
 ```
 

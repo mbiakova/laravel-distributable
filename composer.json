@@ -1,6 +1,6 @@
 {
     "name": "mk-josias/laravel-modulith",
-    "description": "Modular monolith kernel for Laravel: self-describing modules with a database each, ordered events through a transactional outbox, and one codebase deployable as a single process or as per-module services.",
+    "description": "Laravel modules built as microservices: one database each, events and RPC between them. Run them as one app, or split them apart whenever you want.",
     "license": "MIT",
     "type": "library",
     "keywords": [
