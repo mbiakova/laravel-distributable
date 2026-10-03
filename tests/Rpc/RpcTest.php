@@ -105,6 +105,14 @@ it('answers a missing record with a 404, read back as null', function () {
     $this->postJson('/iam/rpc/findUser', $body, signedRpcHeaders('/iam/rpc/findUser', $body))->assertNotFound();
 });
 
+it('answers a method or a contract the module does not serve with a 400, not a failure', function () {
+    foreach (['/iam/rpc/doesNotExist' => rpcBody(IamService::class), '/iam/rpc/findUser' => rpcBody('Foundation\Iam\Contracts\Unknown')] as $path => $body) {
+        $this->postJson($path, $body, signedRpcHeaders($path, $body))
+            ->assertStatus(400)
+            ->assertJsonPath('message', fn (string $message): bool => str_contains($message, 'Module [iam] answers no'));
+    }
+});
+
 it('rejects a stale signature', function () {
     $timestamp = (string) (time() - 3600);
     $body = rpcBody(IamService::class, ['id' => 1]);

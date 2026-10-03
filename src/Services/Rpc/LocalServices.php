@@ -29,6 +29,12 @@ final class LocalServices
         $this->services[$contract] = ['module' => $module, 'implementation' => $implementation];
     }
 
+    /** Only a method of a contract the module declares in its provider's $services can be called. */
+    public function answers(Module $module, string $contract, string $method): bool
+    {
+        return ($this->services[$contract]['module'] ?? null)?->name === $module->name && method_exists($contract, $method);
+    }
+
     /**
      * Runs a method of $contract in its module's context and returns the answer as JSON decodes it,
      * the shape a remote caller receives.
@@ -38,11 +44,11 @@ final class LocalServices
      */
     public function call(Module $module, string $contract, string $method, array $arguments = []): mixed
     {
-        $service = $this->services[$contract] ?? null;
-
-        if ($service === null || $service['module']->name !== $module->name || ! method_exists($contract, $method)) {
+        if (! $this->answers($module, $contract, $method)) {
             throw ModuleException::unknownRpcMethod($module->name, $contract, $method);
         }
+
+        $service = $this->services[$contract];
 
         $answer = $this->context->within(
             $module,

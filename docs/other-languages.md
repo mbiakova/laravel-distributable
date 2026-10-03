@@ -24,7 +24,7 @@ PHP's own, and no other service needs to read it.
 
 | | |
 |---|---|
-| Stream | the stream's `key`, `modulith:events` for the `default` stream |
+| Stream | the stream's `key`, `modulith:events` for the `default` stream, behind the prefix of the Redis connection: Laravel's default is `{app name}-database-`, so the key Redis holds is `laravel-database-modulith:events`. Set `REDIS_PREFIX=` to have the bare key |
 | Entry | `XADD {key} * envelope {json}`: one field, `envelope`, holding [the envelope](events.md#the-envelope) as JSON |
 | `emitter` | the service's name in `modulith.modules` |
 | `id` | a UUID, unique per event: the consumption guard keys on it |
@@ -45,8 +45,14 @@ X-Modulith-Signature: hex(hmac_sha256(secret, timestamp + "\n" + nonce + "\n" + 
 
 `path` is `/{module}/rpc/{method}`, with its leading slash. `body` and `context` are signed as sent,
 byte for byte. `arguments` are named after the method's parameters. `secret` is
-`modulith.rpc.secret`. The answer is the method's return value as JSON; `null` comes back as a 404,
-a bad signature as a 403.
+`modulith.rpc.secret`. The answer is the method's return value as JSON:
+
+| Status | Means |
+|---|---|
+| 200 | the return value, as JSON |
+| 404 | the method returned `null` |
+| 400 | the module serves no such contract or method: `{"message": "…"}` |
+| 403 | the signature is missing, stale, wrong or already used |
 
 The RPC routes are served by the same HTTP server as the modules' own routes, and accept whoever
 holds the secret. Keep `/*/rpc/*` off the public entry point: a gateway forwards client requests
