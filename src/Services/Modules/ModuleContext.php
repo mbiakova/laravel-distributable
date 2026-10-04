@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Distributable\Services\Modules;
 
+use ArrayObject;
 use Closure;
 use Distributable\Config\Modules;
 use Distributable\Data\Module;
@@ -12,6 +13,7 @@ use Illuminate\Container\Container;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Context;
+use Illuminate\Support\Facades\Facade;
 
 /**
  * Which module the running request, job or command belongs to; its connection becomes the
@@ -23,6 +25,8 @@ final class ModuleContext
     public const string CONTEXT_KEY = 'distributable.module';
 
     public const string NO_MODULE = 'no_module';
+
+    private const string SERVICES = 'distributable.module_services';
 
     public function __construct(private readonly ModuleRegistry $registry) {}
 
@@ -43,9 +47,49 @@ final class ModuleContext
             $config->set(Arr::dot((array) $config->get("distributable.overlays.{$module->name}", [])));
         }
 
+        $this->swapServices($module, (array) $config->get('distributable.per_module', []));
+
         $module !== null
             ? Context::addHidden(self::CONTEXT_KEY, $module->name)
             : Context::forgetHidden(self::CONTEXT_KEY);
+    }
+
+    /**
+     * Each service is built once per module, from its binding and with the config just applied, then kept
+     * in the running application: an Octane copy builds its own.
+     *
+     * @param  array<array-key, mixed>  $services
+     */
+    private function swapServices(?Module $module, array $services): void
+    {
+        if ($services === []) {
+            return;
+        }
+
+        $app = Container::getInstance();
+
+        if (! $app->bound(self::SERVICES)) {
+            $app->instance(self::SERVICES, new ArrayObject);
+        }
+
+        /** @var ArrayObject<string, array<string, mixed>> $built */
+        $built = $app->make(self::SERVICES);
+        $owner = $module->name ?? '';
+
+        foreach ($services as $id) {
+            $concrete = $app->getBindings()[$id]['concrete'] ?? null;
+
+            if (! is_string($id) || ! $concrete instanceof Closure) {
+                continue;
+            }
+
+            $instances = $built[$owner] ?? [];
+            $instances[$id] ??= $concrete($app, []);
+            $built[$owner] = $instances;
+
+            $app->instance($id, $instances[$id]);
+            Facade::clearResolvedInstance($id);
+        }
     }
 
     public function switchToModuleOf(string $class): void

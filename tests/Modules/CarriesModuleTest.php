@@ -28,6 +28,19 @@ it('refuses a module code that enters another module, directly or through Coloca
         ->and($this->inModule('iam', static fn (): string => 'entered'))->toBe('entered');
 });
 
+it('gives each module its own instance of a per_module service, built once and swapped in as it runs', function () {
+    config()->set('distributable.per_module', ['cache', 'cache.store']);
+
+    $this->inModule('iam', fn () => Cache::put('owner', 'iam'));
+    $this->inModule('analytics', fn () => Cache::put('owner', 'analytics'));
+    $iam = $this->inModule('iam', fn () => app('cache'));
+
+    expect($this->inModule('iam', fn () => Cache::get('owner')))->toBe('iam')
+        ->and($this->inModule('analytics', fn () => Cache::get('owner')))->toBe('analytics')
+        ->and(Cache::get('owner'))->toBeNull()
+        ->and($this->inModule('iam', fn () => app('cache')))->toBe($iam);
+});
+
 it('runs a scheduled closure in the module that declared it, then leaves the module', function () {
     $this->artisan('schedule:run')->assertSuccessful();
 

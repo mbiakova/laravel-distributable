@@ -38,4 +38,8 @@ return [
     // Path answering which modules this process runs (e.g. '/'), or null to register nothing.
     'status_route' => env('MODULES_STATUS_ROUTE'),
 
+    // Container services built once per module, with that module's config, and swapped in as the
+    // module runs: e.g. ['cache', 'cache.store', 'mail.manager', 'mailer', 'filesystem'].
+    'per_module' => [],
+
 ];
