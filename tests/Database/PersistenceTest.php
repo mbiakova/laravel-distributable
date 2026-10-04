@@ -41,5 +41,12 @@ it('leaves no default connection once the module code has run', function () {
 });
 
 it('fails a query outside every module instead of running it on another database', function () {
-    expect(fn () => User::query()->count())->toThrow(ModuleException::class, 'No module runs here');
+    expect(fn () => DB::table('iam_users')->count())->toThrow(ModuleException::class, 'No module runs here');
+});
+
+it('keeps a module model on its module database, whichever module the code runs in', function () {
+    User::query()->create(['name' => 'outside']);
+    $this->inModule('analytics', fn () => User::query()->create(['name' => 'from-analytics']));
+
+    expect(DB::connection('iam')->table('iam_users')->pluck('name')->all())->toBe(['outside', 'from-analytics']);
 });
