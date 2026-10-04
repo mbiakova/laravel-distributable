@@ -70,12 +70,13 @@ final class DistributableServiceProvider extends BaseServiceProvider
     {
         $this->mergeConfigFrom(__DIR__.'/../../config/distributable.php', 'distributable');
 
-        // Left null, these database drivers would keep the connection of whichever module first used them.
-        $config = $this->app['config'];
-
-        foreach (['cache.stores.database.connection', 'queue.connections.database.connection', 'session.connection'] as $key) {
-            $config->set($key, $config->get($key) ?? $config->get('database.default'));
-        }
+        // Every database belongs to a module: until one runs, the default connection refuses every query.
+        $this->app['config']->set('database.connections.'.ModuleContext::NO_MODULE, ['driver' => ModuleContext::NO_MODULE]);
+        $this->app['config']->set('database.default', ModuleContext::NO_MODULE);
+        $this->app->afterResolving('db', static fn (DatabaseManager $db) => $db->extend(
+            ModuleContext::NO_MODULE,
+            static fn () => throw ModuleException::noModuleRunning(),
+        ));
 
         $this->carryTheModuleIntoDeferredWork();
 

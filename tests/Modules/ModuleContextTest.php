@@ -23,14 +23,11 @@ it('runs a module route on the module connection', function () {
 });
 
 it('runs a module controller in its module, from a route declared outside the module', function () {
-    $application = DB::getDefaultConnection();
     Route::get('outside/connection', ConnectionController::class);
     Route::get('outside/closure', fn (): string => DB::getDefaultConnection());
 
-    $this->get('/outside/closure')->assertOk()->assertContent($application);
+    $this->get('/outside/closure')->assertOk()->assertContent(ModuleContext::NO_MODULE);
     $this->get('/outside/connection')->assertOk()->assertContent('iam');
-
-    expect($application)->not->toBe('iam');
 });
 
 it('runs a module command on the module connection', function () {

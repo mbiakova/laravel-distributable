@@ -10,9 +10,8 @@ use Illuminate\Container\Container;
 use Microservices\Services\Shadows\ShadowRegistry;
 
 /**
- * Which migrations run in which database: the application's own in the default one, and in each
- * module database the application's (laravel-microservices' outbox tables among them), the
- * module's and its copies'.
+ * The migrations of a module database: the application's (laravel-microservices' outbox tables
+ * among them), the module's and its copies'.
  */
 final readonly class ModuleMigrations
 {
@@ -21,20 +20,6 @@ final readonly class ModuleMigrations
         private ShadowRegistry $shadows,
         private Modules $config,
     ) {}
-
-    /** @return list<string> the application's migrations, plus those of the modules that have no database of their own */
-    public function forApplication(): array
-    {
-        $paths = $this->applicationPaths();
-
-        foreach ($this->registry->local() as $module) {
-            if (! $module->hasDatabase && is_dir($module->path().'/database/migrations')) {
-                $paths[] = $module->path().'/database/migrations';
-            }
-        }
-
-        return $paths;
-    }
 
     /** @return list<string> */
     public function forModule(Module $module): array

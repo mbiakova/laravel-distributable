@@ -74,11 +74,3 @@ it('hands Octane a dispatcher that binds each task to its module', function () {
         ->and($this->inModule('iam', fn () => app(DispatchesTasks::class)->resolve(['a' => fn (): string => DB::getDefaultConnection()])))
         ->toBe(['a' => 'iam']);
 });
-
-it('keeps the queue, the session and the database cache on the application connection', function () {
-    $default = DB::getDefaultConnection();
-
-    expect(config('queue.connections.database.connection'))->toBe($default)
-        ->and(config('session.connection'))->toBe($default)
-        ->and(config('cache.stores.database.connection'))->toBe($default);
-});

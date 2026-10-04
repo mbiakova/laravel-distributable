@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Distributable\Exceptions\ModuleException;
+use Distributable\Services\Modules\ModuleContext;
 use Distributable\Tests\Support\DefaultConnectionCommand;
 use Distributable\Tests\Support\ModuleAppTestCase;
 use Illuminate\Database\Schema\Blueprint;
@@ -23,12 +24,9 @@ function iamUsersTable(string $connection): void
 
 it('runs any command in the module --module names, and in no module without it', function () {
     Artisan::registerCommand($this->app->make(DefaultConnectionCommand::class));
-    $application = DB::getDefaultConnection();
 
     $this->artisan('probe:connection --module=iam')->expectsOutput('iam')->assertSuccessful();
-    $this->artisan('probe:connection')->expectsOutput($application)->assertSuccessful();
-
-    expect($application)->not->toBe('iam');
+    $this->artisan('probe:connection')->expectsOutput(ModuleContext::NO_MODULE)->assertSuccessful();
 });
 
 it('seeds a module with its own DatabaseSeeder, or the seeder of its own it is asked for', function () {

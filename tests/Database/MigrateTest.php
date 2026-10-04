@@ -2,37 +2,38 @@
 
 declare(strict_types=1);
 
+use Distributable\Services\Modules\ModuleContext;
 use Distributable\Tests\Support\ModuleAppTestCase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 uses(ModuleAppTestCase::class);
 
-it('migrates the application database, then each local module database on its owner connection', function () {
+it('migrates each local module database on its owner connection, and no other database', function () {
     $this->artisan('migrate')->assertSuccessful();
 
     expect(Schema::connection('iam_owner')->hasTable('iam_users'))->toBeTrue()
         ->and(Schema::connection('iam_owner')->hasTable('event_publications'))->toBeTrue()
         ->and(Schema::connection('iam_owner')->hasTable('event_consumptions'))->toBeTrue()
         ->and(Schema::connection('iam_owner')->hasTable('migrations'))->toBeTrue()
-        ->and(Schema::hasTable('migrations'))->toBeTrue()
-        ->and(Schema::hasTable('iam_users'))->toBeFalse();
+        ->and(Schema::connection('analytics_owner')->hasTable('migrations'))->toBeTrue()
+        ->and(config('database.default'))->toBe(ModuleContext::NO_MODULE);
 });
 
-it('runs the migrations a third-party package loads, in the application database and in each module database', function () {
+it('runs the migrations a third-party package loads in each module database', function () {
     app('migrator')->path(dirname(__DIR__).'/Fixtures/packages/acme/migrations');
 
     $this->artisan('migrate')->assertSuccessful();
 
-    expect(Schema::hasTable('acme_things'))->toBeTrue()
-        ->and(Schema::connection('iam_owner')->hasTable('acme_things'))->toBeTrue();
+    expect(Schema::connection('iam_owner')->hasTable('acme_things'))->toBeTrue()
+        ->and(Schema::connection('analytics_owner')->hasTable('acme_things'))->toBeTrue();
 });
 
-it('limits a run to the modules named, and leaves the application database alone', function () {
+it('limits a run to the modules named', function () {
     $this->artisan('migrate --module=iam')->assertSuccessful();
 
     expect(Schema::connection('iam_owner')->hasTable('iam_users'))->toBeTrue()
-        ->and(Schema::hasTable('migrations'))->toBeFalse();
+        ->and(Schema::connection('analytics_owner')->hasTable('migrations'))->toBeFalse();
 });
 
 it('rolls a module database back with the plain Laravel command', function () {

@@ -179,6 +179,28 @@ it('fails on two modules setting one config key to different values, and leaves 
     }
 });
 
+it('fails on a cache, queue or session kept in a database no module owns', function () {
+    config()->set('queue.default', 'database');
+
+    $this->artisan('distributable:doctor')
+        ->expectsOutputToContain('[queue.default] is the database driver')
+        ->assertFailed();
+});
+
+it('fails on a module with migrations and no database to run them in', function () {
+    $migrations = dirname(__DIR__).'/Fixtures/apps/Gateway/database/migrations';
+    mkdir($migrations, 0755, true);
+
+    try {
+        $this->artisan('distributable:doctor')
+            ->expectsOutputToContain('[gateway] has migrations but no database')
+            ->assertFailed();
+    } finally {
+        rmdir($migrations);
+        rmdir(dirname($migrations));
+    }
+});
+
 it('passes once every module can run', function () {
     $this->artisan('distributable:doctor')->expectsOutputToContain('Every module can run.')->assertSuccessful();
 });

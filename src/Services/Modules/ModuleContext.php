@@ -12,13 +12,14 @@ use Illuminate\Support\Facades\Context;
 
 /**
  * Which module the running request, job or command belongs to; its connection becomes the
- * default one, so a plain DB::transaction() or query lands in that module's database.
+ * default one, so a plain DB::transaction() or query lands in that module's database. Outside a
+ * module with a database the default is NO_MODULE, whose every query fails.
  */
 final class ModuleContext
 {
     public const string CONTEXT_KEY = 'distributable.module';
 
-    private ?string $applicationDefault = null;
+    public const string NO_MODULE = 'no_module';
 
     public function __construct(private readonly ModuleRegistry $registry) {}
 
@@ -26,12 +27,9 @@ final class ModuleContext
     {
         // The running application, not the one this singleton was built in: Octane serves each
         // request from its own copy, with its own config.
-        $config = Container::getInstance()->make(Repository::class);
-        $this->applicationDefault ??= (string) $config->get('database.default');
-
-        $config->set('database.default', $module !== null && $module->hasDatabase
+        Container::getInstance()->make(Repository::class)->set('database.default', $module !== null && $module->hasDatabase
             ? $module->connection()
-            : $this->applicationDefault);
+            : self::NO_MODULE);
 
         $module !== null
             ? Context::addHidden(self::CONTEXT_KEY, $module->name)

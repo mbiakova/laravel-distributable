@@ -93,11 +93,10 @@ php artisan db:seed --module=billing
 ```
 
 Without the option, a command that isn't a module's own runs in no module: `model:show` on a
-module's model then looks for its table in the application's database.
+module's model then throws `ModuleException`, since no database belongs to it.
 
-`migrate --seed` and `migrate:fresh --seed` seed each database with its own seeders: the
-application's `Database\Seeders\DatabaseSeeder` once, then each module's `DatabaseSeeder` in that
-module's run. A module without one is skipped.
+`migrate --seed` and `migrate:fresh --seed` seed each module database with that module's
+`DatabaseSeeder`. A module without one is skipped.
 
 ## Conventions
 

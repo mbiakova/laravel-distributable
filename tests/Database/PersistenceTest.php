@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 use Apps\Iam\Actions\RegisterUser;
 use Apps\Iam\Models\User;
+use Distributable\Exceptions\ModuleException;
+use Distributable\Services\Modules\ModuleContext;
 use Distributable\Tests\Support\ModuleAppTestCase;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -33,18 +34,12 @@ it('transacts on the module connection with a plain DB::transaction() in the mod
         ->and(DB::connection('iam')->table('iam_users')->where('name', 'from-action')->exists())->toBeTrue();
 });
 
-it('puts the application default back once the module code has run', function () {
-    $default = DB::getDefaultConnection();
-
+it('leaves no default connection once the module code has run', function () {
     $this->inModule('iam', fn () => expect(DB::getDefaultConnection())->toBe('iam'));
 
-    expect(DB::getDefaultConnection())->toBe($default);
+    expect(DB::getDefaultConnection())->toBe(ModuleContext::NO_MODULE);
 });
 
-it('keeps the database cache store on the application connection, whichever module uses it first', function () {
-    $default = DB::getDefaultConnection();
-
-    $connection = $this->inModule('iam', fn (): string => Cache::store('database')->getStore()->getConnection()->getName());
-
-    expect($connection)->toBe($default);
+it('fails a query outside every module instead of running it on another database', function () {
+    expect(fn () => User::query()->count())->toThrow(ModuleException::class, 'No module runs here');
 });

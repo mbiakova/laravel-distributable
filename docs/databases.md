@@ -68,15 +68,12 @@ A closure sent to another process (Octane tasks, `Concurrency`, queued closures)
 `laravel/serializable-closure` from its line in the file: keep one closure per line, or the worker
 may rebuild the wrong one.
 
-The database drivers of the cache, the queue and the session would otherwise keep the connection
-of whichever module used them first. When their `connection` is empty, the package sets it to the
-application's default connection.
-
-Outside a module, the application's default connection is used. Code that isn't in a module (your
-`app/`, a route closure, another package's route, Tinker) therefore never uses a module's models:
-`Apps\Iam\Models\User::query()` there reads the application's database, where `iam_users` doesn't
-exist, and throws `ModuleException` once iam runs in another process. It goes through the module's
-contract, which runs in the module's context and still works when the module runs elsewhere:
+Every database belongs to a module: there is no application database. Outside a module, the
+default connection is `ModuleContext::NO_MODULE`, and any query on it throws `ModuleException`
+("No module runs here"). Code that isn't in a module (a route closure in `routes/web.php`, another
+package's route, Tinker without `--module`) therefore never uses a module's models. It goes
+through the module's contract, which runs in the module's context and still works when the module
+runs elsewhere:
 
 ```php
 app(\Foundation\Iam\Contracts\IamService::class)->findUser($id);   // never Apps\Iam\Models\User::find($id)
@@ -103,8 +100,8 @@ $this->receive('analytics', 'iam.user.registered', ['id' => 42]);   // emitter: 
 
 ## Migrations
 
-The package extends Laravel's migrate commands so they run once per database. This also applies
-to `RefreshDatabase` in your tests.
+The package extends Laravel's migrate commands so they run once per module database. This also
+applies to `RefreshDatabase` in your tests.
 
 ```bash
 php artisan migrate | migrate:status | migrate:rollback | migrate:reset | migrate:refresh | migrate:fresh  [--module=*]
@@ -112,10 +109,13 @@ php artisan migrate | migrate:status | migrate:rollback | migrate:reset | migrat
 
 | Database | Migrations |
 |---|---|
-| the application's default database | `database/migrations` and the migrations other packages load with `loadMigrationsFrom()`, plus the migrations of modules that have no database |
 | each local module's database, on `{module}_owner` | the package's tables (`event_publications`, `event_consumptions`), `database/migrations`, the migrations other packages load, the module's `database/migrations` and the shadow migrations of the copies it keeps |
 
-`--module` runs the command for those modules only and skips the application's database. With an
+A module without a database has no migrations: `distributable:doctor` reports one that does. The
+`database` drivers of the cache, the queue and the session have no database to use either, and
+the doctor reports them too: use `redis`, `file` or `array`.
+
+`--module` runs the command for those modules only. With an
 explicit `--database` or `--path`, the command behaves like the normal Laravel command. Each
 database keeps its own migration history.
 

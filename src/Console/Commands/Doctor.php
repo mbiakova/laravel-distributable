@@ -42,6 +42,10 @@ final class Doctor extends Command
                 }
             }
 
+            if (! $module->hasDatabase && is_dir($module->path().'/database/migrations')) {
+                $problems[] = "[{$module->name}] has migrations but no database: declare its connection in its config/database.php.";
+            }
+
             foreach ($autoload->stale($module) as $namespace => $paths) {
                 $problems[] = "composer.json maps [{$namespace}] to [{$paths['declared']}], but the module lives in [{$paths['expected']}].";
             }
@@ -52,6 +56,12 @@ final class Doctor extends Command
                 $problems[] = "{$contract} is not in the foundation of a declared module.";
             } elseif (! $registry->isLocal($service['service']) && $config->getHost($service['service']) === null) {
                 $problems[] = "[{$service['service']}] runs elsewhere and serves {$contract}, but distributable.modules.{$service['service']}.host is not set.";
+            }
+        }
+
+        foreach (['cache.default', 'queue.default', 'session.driver'] as $key) {
+            if (config($key) === 'database') {
+                $problems[] = "[{$key}] is the database driver, but every database belongs to a module: use redis, file or array.";
             }
         }
 

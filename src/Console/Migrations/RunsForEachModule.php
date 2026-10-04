@@ -11,9 +11,9 @@ use Microservices\Migrations\ShadowMigration;
 use Symfony\Component\Console\Input\InputOption;
 
 /**
- * Turns a Laravel migrate:* command into one run per database: the application's default one,
- * then each local module's, on its {module}_owner connection. An explicit --database or --path
- * is Laravel's own command, unchanged — which is also how each run executes.
+ * Turns a Laravel migrate:* command into one run per local module database, on its {module}_owner
+ * connection. An explicit --database or --path is Laravel's own command, unchanged — which is also
+ * how each run executes.
  */
 trait RunsForEachModule
 {
@@ -31,10 +31,6 @@ trait RunsForEachModule
         $migrations = $this->laravel->make(ModuleMigrations::class);
         $only = (array) $this->input->getOption('module');
         $exitCode = self::SUCCESS;
-
-        if ($only === []) {
-            $exitCode = $this->runOn((string) $this->laravel['config']->get('database.default'), $migrations->forApplication());
-        }
 
         foreach ($this->laravel->make(ModuleRegistry::class)->local() as $module) {
             if (! $module->hasDatabase || ($only !== [] && ! in_array($module->name, $only, true)) || $exitCode !== self::SUCCESS) {

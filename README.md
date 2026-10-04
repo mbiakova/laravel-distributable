@@ -143,7 +143,7 @@ request on /analytics/…        database.default = analytics
   └─ calls IamService::findUser()
        └─ iam's code runs      database.default = iam          the query lands in iam's database
   └─ back in analytics         database.default = analytics
-outside any module             database.default = the application's connection
+outside any module             database.default = no_module    any query throws ModuleException
 ```
 
 The switch happens at every way into a module's code, so nothing has to ask for it:
@@ -211,10 +211,10 @@ does, so you know where a package's data ends up:
 
 | What the package does | Where | What it means for another package |
 |---|---|---|
-| While a module's code runs, `database.default` is that module's connection | `ModuleContext` | A package that uses the default connection (a media library, an activity log, permissions) stores its rows in the database of the module that calls it, so each module has its own. Its tables are there because its migrations run in every module database. A package that should keep one store for the whole application (Telescope, Pulse) is given the application's connection in its own config file. |
+| While a module's code runs, `database.default` is that module's connection | `ModuleContext` | A package that uses the default connection (a media library, an activity log, permissions) stores its rows in the database of the module that calls it, so each module has its own. Its tables are there because its migrations run in every module database. A package that should keep one store for the whole application (Telescope, Pulse) belongs to one module, whose connection it is given in its own config file. |
 | `migrate`, `migrate:status`, `migrate:rollback`, `migrate:reset`, `migrate:refresh` and `migrate:fresh` run once per database | `DistributableServiceProvider::registerModuleMigrations()` | A package's migrations, loaded with `loadMigrationsFrom()` or published to `database/migrations`, run in each database with nothing to configure. With an explicit `--database` or `--path`, the commands behave exactly as Laravel's. A package that replaces these same commands would overlap with this, which is rare; the one registered last is used. |
 | Failed jobs and job batches are stored per module, with the `database` drivers | `registerQueueDatabases()` | They go to the database of the module owning the job. Other drivers (Horizon, `file`, DynamoDB) are untouched. |
-| The `database` cache, queue and session drivers stay on the application's connection | `register()` | Laravel leaves their `connection` empty, meaning "the default one". Since the default is the current module's, their tables would be looked for in a module's database. The package fills an empty value with the application's connection, so cache, jobs and sessions stay in one place. A value you set yourself is kept. |
+| Outside a module, the default connection is `no_module`, which throws on every query | `register()`, `ModuleContext` | Every database belongs to a module. A package that queries the default connection outside a module fails loudly; the `database` cache, queue and session drivers have nowhere to go, and `distributable:doctor` reports them. |
 | `DeferredCallbackCollection`, the Concurrency `process` driver, Octane's `DispatchesTasks` | `carryTheModuleIntoDeferredWork()` | Work started in a module keeps its module. A package rebinding one of them removes that, for its own work. |
 | Module providers register on `booting`, after every package provider | `registerLocalModuleProviders()` | A module can override what a package binds. |
 | `Factory::guessFactoryNamesUsing()` and `guessModelNamesUsing()` | `Support\ModuleFactories::register()` | A module model finds its factory in the module; any other class keeps Laravel's rule. A package or an application that sets its own resolver replaces this one, and can delegate to `ModuleFactories`. |
@@ -224,7 +224,7 @@ does, so you know where a package's data ends up:
 | A class of a module this process doesn't run throws `ModuleException` from the autoloader | `autoloadModules()` | `class_exists()` on such a class throws instead of returning `false`. A package probing classes (discovery, morph maps) must only meet classes of the modules this process runs. |
 
 Publishing a package's migrations with `vendor:publish` puts them in `database/migrations`: they then run in
-the application's database and in every module database, like your own root migrations. Move a
+every module database, like your own root migrations. Move a
 published migration to a module's `database/migrations` when only that module uses the package.
 
 A package that keeps one store for the whole application belongs to one module. Laravel Sanctum is
@@ -314,7 +314,7 @@ return ['connections' => [
 ```
 
 ```bash
-php artisan migrate   # migrates the application's database, then each module's
+php artisan migrate   # migrates each module's database
 ```
 
 Emit an event from one module and handle it in another:
