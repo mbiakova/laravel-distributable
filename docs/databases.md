@@ -80,11 +80,6 @@ runs elsewhere:
 app(\Foundation\Iam\Contracts\IamService::class)->findUser($id);   // never Apps\Iam\Models\User::find($id)
 ```
 
-A module's model can also name its connection itself, so it never depends on the context:
-`use Distributable\Traits\OnModuleConnection;` makes `getConnectionName()` return its module's
-connection, read from its namespace, or the owner's while `db:seed` runs. Raw `DB::` queries and
-other packages' models still follow the context.
-
 `Services\Modules\ModuleContext::current()` returns the current module (`Data\Module`) or null,
 and `within($module, $callback)` runs a callback in a module's context. Only the package, tests and
 the module's own code may enter a module: when the code calling `within()` (directly, or through
