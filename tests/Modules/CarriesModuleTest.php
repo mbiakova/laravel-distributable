@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use Apps\Analytics\Reports\EntersIam;
 use Carbon\CarbonInterval;
+use Distributable\Exceptions\ModuleException;
 use Distributable\Services\Modules\ModuleContext;
 use Distributable\Support\ModuleConcurrencyDriver;
 use Distributable\Support\ModuleTaskDispatcher;
@@ -16,6 +18,15 @@ use Laravel\Octane\Contracts\DispatchesTasks;
 use Laravel\SerializableClosure\SerializableClosure;
 
 uses(ModuleAppTestCase::class);
+
+it('refuses a module code that enters another module, directly or through Colocation', function () {
+    $analytics = app(EntersIam::class);
+
+    expect(fn () => $analytics->directly('iam'))->toThrow(ModuleException::class, 'makes analytics code run in module [iam]')
+        ->and(fn () => $analytics->throughColocation('iam'))->toThrow(ModuleException::class, 'makes analytics code run in module [iam]')
+        ->and($analytics->directly('analytics'))->toBe('entered')
+        ->and($this->inModule('iam', static fn (): string => 'entered'))->toBe('entered');
+});
 
 it('runs a scheduled closure in the module that declared it, then leaves the module', function () {
     $this->artisan('schedule:run')->assertSuccessful();

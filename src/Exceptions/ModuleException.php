@@ -44,6 +44,11 @@ final class ModuleException extends RuntimeException
         return new self('No module runs here, and every database belongs to a module: run this code in one (a module route, job or command, --module, or ModuleContext::within()).');
     }
 
+    public static function entersAnotherModule(string $from, string $module, string $file): self
+    {
+        return new self("[{$file}] makes {$from} code run in module [{$module}], on its database: go through its foundation contract or an event.");
+    }
+
     /** A class the package needs to attach to a module lives outside every module namespace. */
     public static function outsideModule(string $class): self
     {
