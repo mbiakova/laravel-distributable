@@ -34,6 +34,7 @@ use Distributable\Support\ModuleConcurrencyDriver;
 use Distributable\Support\ModuleDeferredCallbacks;
 use Distributable\Support\ModuleFactories;
 use Distributable\Support\ModuleTaskDispatcher;
+use Distributable\Support\ScheduledTasks;
 use Illuminate\Bus\BatchFactory;
 use Illuminate\Bus\BatchRepository as BatchRepositoryContract;
 use Illuminate\Bus\DatabaseBatchRepository;
@@ -42,6 +43,9 @@ use Illuminate\Concurrency\ProcessDriver;
 use Illuminate\Console\Command;
 use Illuminate\Console\Events\CommandFinished;
 use Illuminate\Console\Events\CommandStarting;
+use Illuminate\Console\Events\ScheduledTaskFailed;
+use Illuminate\Console\Events\ScheduledTaskFinished;
+use Illuminate\Console\Events\ScheduledTaskStarting;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Console\Kernel as ConsoleKernel;
 use Illuminate\Contracts\Events\Dispatcher;
@@ -106,6 +110,7 @@ final class DistributableServiceProvider extends BaseServiceProvider
         ModuleFactories::register();
 
         $this->app->singleton(ModuleGenerators::class);
+        $this->app->singleton(ScheduledTasks::class);
         $this->app->afterResolving(Command::class, ModuleOption::addTo(...));
         $this->app->extend(SeedCommand::class, static fn (mixed $command, Application $app): ModuleSeedCommand => new ModuleSeedCommand($app->make('db')));
 
@@ -203,6 +208,14 @@ final class DistributableServiceProvider extends BaseServiceProvider
                 $this->app->make(ModuleContext::class)->switchTo($this->app->make(ModuleRegistry::class)->get($named));
             }
         });
+
+        // schedule:run is no module's command: a task runs in the module that declared it, then leaves it.
+        Event::listen(ScheduledTaskStarting::class, function (ScheduledTaskStarting $event): void {
+            $module = $this->app->make(ScheduledTasks::class)->moduleOf($event->task);
+            $this->app->make(ModuleContext::class)->switchTo($module === null ? null : $this->app->make(ModuleRegistry::class)->get($module));
+        });
+
+        Event::listen([ScheduledTaskFinished::class, ScheduledTaskFailed::class], fn () => $this->app->make(ModuleContext::class)->switchTo(null));
 
         Queue::before(function (JobProcessing $event): void {
             $context = $this->app->make(ModuleContext::class);

@@ -213,6 +213,7 @@ module directory:
 | `resources/views/` | Loaded under the module name: `view('iam::welcome')`. Anonymous components of `resources/views/components` and class components of `app/View/Components` are `<x-iam::alert />`. |
 | Artisan commands | Every `Illuminate\Console\Command` in `app/` is registered (console only). |
 | `$listen` on the provider | The Laravel events the module listens to, written as in `EventServiceProvider::$listen`. Each listener runs in the module, whichever module dispatched the event; a queued one keeps working as Laravel queues it, and an after-commit one runs once the transaction commits, still in the module. |
+| `schedule(Schedule $schedule)` on the provider | The module's scheduled tasks. Only a process that runs the module schedules them, and `schedule:run` runs each one in the module, closures included. A task scheduled elsewhere runs in no module. |
 
 How the config merge works, and what it can't do:
 

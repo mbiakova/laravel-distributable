@@ -12,6 +12,9 @@ use Distributable\Providers\ModuleServiceProvider;
 use Distributable\Tests\Support\SomethingCommitted;
 use Distributable\Tests\Support\SomethingHappened;
 use Foundation\Iam\Contracts\IamService as Contract;
+use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 final class IamServiceProvider extends ModuleServiceProvider
 {
@@ -27,4 +30,9 @@ final class IamServiceProvider extends ModuleServiceProvider
         ],
         SomethingCommitted::class => [AfterCommitRecordEventConnection::class],
     ];
+
+    protected function schedule(Schedule $schedule): void
+    {
+        $schedule->call(static fn () => Cache::put('scheduled-connection', DB::getDefaultConnection()))->everyMinute();
+    }
 }

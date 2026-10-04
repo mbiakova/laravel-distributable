@@ -17,6 +17,13 @@ use Laravel\SerializableClosure\SerializableClosure;
 
 uses(ModuleAppTestCase::class);
 
+it('runs a scheduled closure in the module that declared it, then leaves the module', function () {
+    $this->artisan('schedule:run')->assertSuccessful();
+
+    expect(Cache::get('scheduled-connection'))->toBe('iam')
+        ->and(DB::getDefaultConnection())->toBe(ModuleContext::NO_MODULE);
+});
+
 it('runs a queued closure in the module that queued it', function () {
     $this->inModule('iam', static function (): void {
         dispatch(static fn () => Cache::put('connection', DB::getDefaultConnection()));

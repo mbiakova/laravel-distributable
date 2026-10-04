@@ -6,8 +6,10 @@ namespace Distributable\Providers;
 
 use Distributable\Http\Middleware\SetModuleContext;
 use Distributable\Services\Modules\ModuleContext;
+use Distributable\Support\ScheduledTasks;
 use Distributable\Traits\ResolvesModule;
 use Illuminate\Console\Command;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Events\ShouldHandleEventsAfterCommit;
 use Illuminate\Routing\Router;
@@ -22,7 +24,7 @@ use Microservices\Services\Rpc\LocalServices;
  * Base service provider a module extends to get, without manual wiring: config merging
  * (each {module}/config/*.php deep-merges into the matching root config),
  * translations ({module}/lang, namespaced by the module name),
- * routes ({module}/routes/{name}.php, prefixed {module}/{name}) and console commands.
+ * routes ({module}/routes/{name}.php, prefixed {module}/{name}), console commands and scheduled tasks.
  * Registered only for local modules (DistributableServiceProvider follows RUN_MODULES), so a
  * module's config lands only on the nodes that run it.
  */
@@ -60,6 +62,22 @@ abstract class ModuleServiceProvider extends BaseServiceProvider
         $this->loadModuleViews();
         $this->registerModuleCommands();
         $this->registerModuleListeners();
+        $this->registerModuleSchedule();
+    }
+
+    /** The module's scheduled tasks: only a process that runs the module schedules them, and each runs in it. */
+    protected function schedule(Schedule $schedule): void {}
+
+    private function registerModuleSchedule(): void
+    {
+        $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
+            $declared = count($schedule->events());
+            $this->schedule($schedule);
+
+            foreach (array_slice($schedule->events(), $declared) as $task) {
+                $this->app->make(ScheduledTasks::class)->assign($task, $this->module->name);
+            }
+        });
     }
 
     /** Views, anonymous components and class components, all under the module name: view('iam::welcome'), <x-iam::alert />. */
