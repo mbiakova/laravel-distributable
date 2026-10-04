@@ -10,6 +10,7 @@ use Distributable\Data\Module;
 use Distributable\Exceptions\ModuleException;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Config\Repository;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Context;
 
 /**
@@ -29,9 +30,18 @@ final class ModuleContext
     {
         // The running application, not the one this singleton was built in: Octane serves each
         // request from its own copy, with its own config.
-        Container::getInstance()->make(Repository::class)->set('database.default', $module !== null && $module->hasDatabase
+        $config = Container::getInstance()->make(Repository::class);
+
+        $config->set('database.default', $module !== null && $module->hasDatabase
             ? $module->connection()
             : self::NO_MODULE);
+
+        // The application's values first, then the ones this module sets for itself (ModuleServiceProvider).
+        $config->set(Arr::dot((array) $config->get('distributable.overlay_base', [])));
+
+        if ($module !== null) {
+            $config->set(Arr::dot((array) $config->get("distributable.overlays.{$module->name}", [])));
+        }
 
         $module !== null
             ? Context::addHidden(self::CONTEXT_KEY, $module->name)

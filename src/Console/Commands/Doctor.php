@@ -104,6 +104,11 @@ final class Doctor extends Command
         $conflicts = [];
 
         foreach ($values as $key => $byModule) {
+            // A value the application already sets is each module's own, applied while it runs.
+            if (config()->has("distributable.overlay_base.{$key}")) {
+                continue;
+            }
+
             if (count(array_unique(array_map(serialize(...), $byModule))) > 1) {
                 $conflicts[$key] = implode(', ', array_keys($byModule));
             }

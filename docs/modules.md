@@ -221,7 +221,8 @@ How the config merge works, and what it can't do:
 |---|---|
 | a list (`['a', 'b']`) | gains the items it lacks; a module can't remove or replace an item, so set the whole list in the root config |
 | any other array, integer keys included (`[404 => …]`) | merged key by key |
-| a scalar two local modules set differently | the module registered last wins in one process, while each keeps its own once they run apart: `distributable:doctor` reports it |
+| a scalar the root config already sets (`cache.prefix`, a mailer, a disk root) | the module's own value: applied while its code runs, the root one back outside it. Two modules in one process each keep theirs. A service built once and kept (a resolved cache store, a mailer) holds the value it was built with. |
+| a scalar the root config doesn't set, that two local modules set differently | the module registered last wins in one process, while each keeps its own once they run apart: `distributable:doctor` reports it |
 | when it runs | as the module's provider registers, after every package provider: a package reading its config in its own `register()` doesn't see the module's values |
 | its scope | the whole process: a module overriding a package's config changes it for every module running there |
 

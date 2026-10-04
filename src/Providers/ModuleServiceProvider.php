@@ -13,6 +13,7 @@ use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Events\ShouldHandleEventsAfterCommit;
 use Illuminate\Routing\Router;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider as BaseServiceProvider;
@@ -22,7 +23,8 @@ use Microservices\Services\Rpc\LocalServices;
 
 /**
  * Base service provider a module extends to get, without manual wiring: config merging
- * (each {module}/config/*.php deep-merges into the matching root config),
+ * (each {module}/config/*.php deep-merges into the matching root config; a value the root config
+ * already sets is the module's own instead, applied while the module runs),
  * translations ({module}/lang, namespaced by the module name),
  * routes ({module}/routes/{name}.php, prefixed {module}/{name}), console commands and scheduled tasks.
  * Registered only for local modules (DistributableServiceProvider follows RUN_MODULES), so a
@@ -137,8 +139,43 @@ abstract class ModuleServiceProvider extends BaseServiceProvider
 
         foreach (glob($configPath.'/*.php') ?: [] as $configFile) {
             $key = pathinfo($configFile, PATHINFO_FILENAME);
-            config()->set($key, $this->deepMerge(config($key, []), require $configFile));
+            self::$applicationConfig[$key] ??= (array) config($key, []);
+            $values = require $configFile;
+
+            // A scalar the application already sets is the module's own value: applied while the module runs.
+            foreach (Arr::dot($values) as $path => $value) {
+                if (! is_array($value) && $this->overridesApplicationScalar(self::$applicationConfig[$key], $path)) {
+                    config()->set("distributable.overlays.{$this->module->name}.{$key}.{$path}", $value);
+                    config()->set("distributable.overlay_base.{$key}.{$path}", Arr::get(self::$applicationConfig[$key], $path));
+                    Arr::forget($values, $path);
+                }
+            }
+
+            config()->set($key, $this->deepMerge(config($key, []), $values));
         }
+    }
+
+    /** @var array<string, array<array-key, mixed>> each root config file as the application set it, before any module */
+    private static array $applicationConfig = [];
+
+    /**
+     * An item of a list is appended, never overridden.
+     *
+     * @param  array<array-key, mixed>  $application
+     */
+    private function overridesApplicationScalar(array $application, string $path): bool
+    {
+        $node = $application;
+
+        foreach (explode('.', $path) as $segment) {
+            if (! is_array($node) || array_is_list($node) || ! array_key_exists($segment, $node)) {
+                return false;
+            }
+
+            $node = $node[$segment];
+        }
+
+        return ! is_array($node);
     }
 
     /**

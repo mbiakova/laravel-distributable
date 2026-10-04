@@ -44,14 +44,16 @@ it('serves the RPC endpoint of each local module inside the signed rpc group', f
         ->and($route->defaults['service'])->toBe('iam');
 });
 
-it('deep-merges the module config over the root config', function () {
+it('deep-merges the module config over the root config, and applies the values it overrides while the module runs', function () {
     expect(config('iam.flag'))->toBeTrue()
         ->and(config('iam.items'))->toBe(['from-root', 'from-module'])
-        ->and(config('iam.nested'))->toBe(['kept' => 'root', 'override' => 'module']);
+        ->and(config('iam.nested'))->toBe(['kept' => 'root', 'override' => 'root'])
+        ->and($this->inModule('iam', fn () => config('iam.nested')))->toBe(['kept' => 'root', 'override' => 'module'])
+        ->and($this->inModule('analytics', fn () => config('iam.nested.override')))->toBe('root');
 });
 
 it('merges an array keyed by integers key by key, as it does any other map', function () {
-    expect(config('iam.codes'))->toBe([403 => 'root forbidden', 404 => 'module not found']);
+    expect($this->inModule('iam', fn () => config('iam.codes')))->toBe([403 => 'root forbidden', 404 => 'module not found']);
 });
 
 it('appends a list item once, however many times it is declared', function () {

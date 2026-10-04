@@ -164,9 +164,9 @@ it('fails when modules serve RPC contracts and no secret signs the calls', funct
         ->assertFailed();
 });
 
-it('fails on two modules setting one config key to different values, and leaves lists alone', function () {
+it('fails on two modules setting one new config key to different values, and leaves lists and per-module values alone', function () {
     $file = dirname(__DIR__).'/Fixtures/apps/Analytics/config/iam.php';
-    file_put_contents($file, "<?php\n\nreturn ['flag' => false, 'items' => ['from-analytics'], 'nested' => ['override' => 'module']];\n");
+    file_put_contents($file, "<?php\n\nreturn ['flag' => false, 'items' => ['from-analytics'], 'nested' => ['override' => 'analytics']];\n");
 
     try {
         $this->artisan('distributable:doctor')
