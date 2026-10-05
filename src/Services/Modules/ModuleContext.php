@@ -11,6 +11,7 @@ use Distributable\Data\Module;
 use Distributable\Exceptions\ModuleException;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Config\Repository;
+use Illuminate\Foundation\Application;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\Facade;
@@ -55,8 +56,8 @@ final class ModuleContext
     }
 
     /**
-     * Each service is built once per module, from its binding and with the config just applied, then kept
-     * in the running application: an Octane copy builds its own.
+     * Each service is built once per module, as make() builds it (deferred provider, extenders) with the
+     * config just applied, then kept in the running application: an Octane copy builds its own.
      *
      * @param  array<array-key, mixed>  $services
      */
@@ -66,7 +67,7 @@ final class ModuleContext
             return;
         }
 
-        $app = Container::getInstance();
+        $app = Application::getInstance();
 
         if (! $app->bound(self::SERVICES)) {
             $app->instance(self::SERVICES, new ArrayObject);
@@ -77,14 +78,17 @@ final class ModuleContext
         $owner = $module->name ?? '';
 
         foreach ($services as $id) {
-            $concrete = $app->getBindings()[$id]['concrete'] ?? null;
-
-            if (! is_string($id) || ! $concrete instanceof Closure) {
+            if (! is_string($id) || ! ($app->isDeferredService($id) || isset($app->getBindings()[$id]))) {
                 continue;
             }
 
             $instances = $built[$owner] ?? [];
-            $instances[$id] ??= $concrete($app, []);
+
+            if (! isset($instances[$id])) {
+                $app->forgetInstance($id);
+                $instances[$id] = $app->make($id);
+            }
+
             $built[$owner] = $instances;
 
             $app->instance($id, $instances[$id]);

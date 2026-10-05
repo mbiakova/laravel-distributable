@@ -3,11 +3,13 @@
 declare(strict_types=1);
 
 use Apps\Analytics\Reports\EntersIam;
+use ArrayObject;
 use Carbon\CarbonInterval;
 use Distributable\Exceptions\ModuleException;
 use Distributable\Services\Modules\ModuleContext;
 use Distributable\Support\ModuleConcurrencyDriver;
 use Distributable\Support\ModuleTaskDispatcher;
+use Distributable\Tests\Support\DeferredReportsProvider;
 use Distributable\Tests\Support\ModuleAppTestCase;
 use Illuminate\Contracts\Concurrency\Driver;
 use Illuminate\Support\Defer\DeferredCallback;
@@ -39,6 +41,24 @@ it('gives each module its own instance of a per_module service, built once and s
         ->and($this->inModule('analytics', fn () => Cache::get('owner')))->toBe('analytics')
         ->and(Cache::get('owner'))->toBeNull()
         ->and($this->inModule('iam', fn () => app('cache')))->toBe($iam);
+});
+
+it('builds a per_module service of a deferred provider on the first switch, through its extenders', function () {
+    app()->addDeferredServices(['reports' => DeferredReportsProvider::class]);
+    app()->extend('reports', static function (ArrayObject $reports): ArrayObject {
+        $reports['extended'] = true;
+
+        return $reports;
+    });
+    config()->set('distributable.per_module', ['reports']);
+
+    $iam = $this->inModule('iam', fn () => app('reports'));
+    $analytics = $this->inModule('analytics', fn () => app('reports'));
+
+    expect($iam)->not->toBe($analytics)
+        ->and($iam['extended'] ?? false)->toBeTrue()
+        ->and($analytics['extended'] ?? false)->toBeTrue()
+        ->and($this->inModule('iam', fn () => app('reports')))->toBe($iam);
 });
 
 it('runs a scheduled closure in the module that declared it, then leaves the module', function () {
