@@ -37,9 +37,9 @@ final class MakeModule extends Command
 
                 namespace {$module->namespace}\\Providers;
 
-                use Distributable\\Providers\\ModuleServiceProvider;
+                use Distributable\\Providers\\ServiceProvider;
 
-                final class {$providerClass} extends ModuleServiceProvider {}
+                final class {$providerClass} extends ServiceProvider {}
 
                 PHP,
             'routes/api.php' => "<?php\n\ndeclare(strict_types=1);\n\nuse Illuminate\\Support\\Facades\\Route;\n",

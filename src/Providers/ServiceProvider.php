@@ -30,7 +30,7 @@ use Microservices\Services\Rpc\LocalServices;
  * Registered only for local modules (DistributableServiceProvider follows RUN_MODULES), so a
  * module's config lands only on the nodes that run it.
  */
-abstract class ModuleServiceProvider extends BaseServiceProvider
+abstract class ServiceProvider extends BaseServiceProvider
 {
     use ResolvesModule;
 
@@ -40,11 +40,15 @@ abstract class ModuleServiceProvider extends BaseServiceProvider
     /** @var array<class-string, list<string>> as EventServiceProvider::$listen: event => listener classes, or Class@method */
     protected array $listen = [];
 
+    /** @var array<string, list<class-string>> as microservices.events.listen: event name => Handler classes */
+    protected array $handlers = [];
+
     public function register(): void
     {
         // A cached config already holds the merge, made while the .env was still loaded.
         if (! $this->app->configurationIsCached()) {
             $this->mergeModuleConfigs();
+            $this->mergeModuleHandlers();
         }
 
         $local = $this->app->make(LocalServices::class);
@@ -153,6 +157,17 @@ abstract class ModuleServiceProvider extends BaseServiceProvider
 
             config()->set($key, $this->deepMerge(config($key, []), $values));
         }
+    }
+
+    private function mergeModuleHandlers(): void
+    {
+        $listen = (array) config('microservices.events.listen', []);
+
+        foreach ($this->handlers as $event => $handlers) {
+            $listen[$event] = array_values(array_unique([...$listen[$event] ?? [], ...$handlers]));
+        }
+
+        config()->set('microservices.events.listen', $listen);
     }
 
     /** @var array<string, array<array-key, mixed>> each root config file as the application set it, before any module */

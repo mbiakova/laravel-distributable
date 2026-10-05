@@ -40,7 +40,7 @@ final class ModuleContext
             ? $module->connection()
             : self::NO_MODULE);
 
-        // The application's values first, then the ones this module sets for itself (ModuleServiceProvider).
+        // The application's values first, then the ones this module sets for itself (ServiceProvider).
         $config->set(Arr::dot((array) $config->get('distributable.overlay_base', [])));
 
         if ($module !== null) {

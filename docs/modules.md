@@ -202,7 +202,7 @@ With `MODULES_STATUS_ROUTE=/`, the process returns the modules it runs:
 
 ## The module service provider
 
-A provider that extends `Distributable\Providers\ModuleServiceProvider` loads the following from the
+A provider that extends `Distributable\Providers\ServiceProvider` loads the following from the
 module directory:
 
 | Source | What happens |
@@ -213,6 +213,7 @@ module directory:
 | `resources/views/` | Loaded under the module name: `view('iam::welcome')`. Anonymous components of `resources/views/components` and class components of `app/View/Components` are `<x-iam::alert />`. |
 | Artisan commands | Every `Illuminate\Console\Command` in `app/` is registered (console only). |
 | `$listen` on the provider | The Laravel events the module listens to, written as in `EventServiceProvider::$listen`. Each listener runs in the module, whichever module dispatched the event; a queued one keeps working as Laravel queues it, and an after-commit one runs once the transaction commits, still in the module. |
+| `$handlers` on the provider | The stream events the module handles, written as `microservices.events.listen`: event name => `Handler` classes. Merged into that config only where the module runs. |
 | `schedule(Schedule $schedule)` on the provider | The module's scheduled tasks. Only a process that runs the module schedules them, and `schedule:run` runs each one in the module, closures included. A task scheduled elsewhere runs in no module. |
 
 How the config merge works, and what it can't do:
@@ -229,7 +230,7 @@ How the config merge works, and what it can't do:
 A module's Laravel listeners go in `$listen`:
 
 ```php
-final class IamServiceProvider extends ModuleServiceProvider
+final class IamServiceProvider extends ServiceProvider
 {
     protected array $listen = [
         \Illuminate\Auth\Events\Login::class => [\Apps\Iam\Listeners\RecordLogin::class],

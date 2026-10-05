@@ -19,13 +19,14 @@ Calls and events are configured in `config/microservices.php`
 store, the streams, the guard and the propagated context. See
 [laravel-microservices' configuration](https://github.com/mk-josias/laravel-microservices/blob/main/docs/configuration.md).
 Every module of `distributable.modules`, with its host, is a service there: don't declare it again. A
-module adds its handlers and its streams in its own `config/microservices.php`.
+module declares its handlers in `$handlers` of its service provider, and its streams in its own
+`config/microservices.php`.
 
 ## Source layout
 
 ```
 src/
-├── Providers/          DistributableServiceProvider · ModuleServiceProvider · FoundationServiceProvider
+├── Providers/          DistributableServiceProvider · ServiceProvider · FoundationServiceProvider
 ├── Http/               Controllers/StatusController · Middleware/SetModuleContext
 ├── Console/Commands/   Install · MakeModule · DeleteModule · ListModules · Doctor · PurgeModules · UnusedPackages · CacheModules · ClearModules
 ├── Console/Migrations/ MigrateCommand · StatusCommand · RollbackCommand · ResetCommand · RefreshCommand

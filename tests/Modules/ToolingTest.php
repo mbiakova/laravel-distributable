@@ -47,7 +47,7 @@ it('creates a module, its provider and its foundation directory, and declares it
 
         expect(file_get_contents($root.'/apps/PointOfSale/app/Providers/PointOfSaleServiceProvider.php'))
             ->toContain('namespace Apps\PointOfSale\Providers;')
-            ->toContain('final class PointOfSaleServiceProvider extends ModuleServiceProvider {}')
+            ->toContain('final class PointOfSaleServiceProvider extends ServiceProvider {}')
             ->and(is_file($root.'/apps/PointOfSale/routes/api.php'))->toBeTrue()
             ->and(file_get_contents($root.'/apps/PointOfSale/config/database.php'))->toContain("'point_of_sale_owner'")
             ->and(is_dir($root.'/foundation/PointOfSale/Contracts'))->toBeTrue()

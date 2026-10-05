@@ -10,7 +10,7 @@ same in every setup.
 | | In a module |
 |---|---|
 | the emitter | the module the event class belongs to: `Apps\Iam\Events\UserRegistered` is emitted by `iam` |
-| the handlers | declared in the module's own `config/microservices.php`, merged only where the module runs |
+| the handlers | declared in `$handlers` of the module's service provider, merged only where the module runs |
 | a handler runs | in its module's [context](../README.md#the-module-context): its queries land in its module's database |
 | the outbox | `event_publications` in the emitting module's database, inside the module's transaction |
 | the guard | `event_consumptions` in the consuming module's database |
@@ -18,8 +18,8 @@ same in every setup.
 | streams | a module can add its own in its `config/microservices.php` |
 
 ```php
-// apps/Analytics/config/microservices.php
-return ['events' => ['listen' => ['iam.user.registered' => [RecordSignup::class]]]];
+// apps/Analytics/app/Providers/AnalyticsServiceProvider.php
+protected array $handlers = ['iam.user.registered' => [RecordSignup::class]];
 
 // foundation/FoundationServiceProvider.php
 protected array $payloads = ['iam.user.registered' => UserRegisteredPayload::class];

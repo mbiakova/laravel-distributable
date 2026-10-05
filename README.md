@@ -220,7 +220,7 @@ does, so you know where a package's data ends up:
 | `Factory::guessFactoryNamesUsing()` and `guessModelNamesUsing()` | `Support\ModuleFactories::register()` | A module model finds its factory in the module; any other class keeps Laravel's rule. A package or an application that sets its own resolver replaces this one, and can delegate to `ModuleFactories`. |
 | Every Artisan command gets a `--module` option, unless it already has one | `Console\ModuleOption` | A package's command can be run in a module's context. During a `make:*` command with `--module`, the application path, database path, config path and namespace are the module's, then restored (`Console\ModuleGenerators`). Without `--module`, nothing changes. |
 | `db:seed` is replaced | `Console\ModuleSeedCommand` | In a module's context it runs the module's seeders; outside one it is Laravel's command, unchanged. |
-| A module's `$listen` wraps each listener in the module's context | `ModuleServiceProvider::registerModuleListeners()` | A module can listen to a package's events (`Login`, a media event) and still write to its own database. A listener registered another way (`Event::listen()` in `boot()`, discovery, a subscriber) runs in the context of whoever dispatched the event. |
+| A module's `$listen` wraps each listener in the module's context | `ServiceProvider::registerModuleListeners()` | A module can listen to a package's events (`Login`, a media event) and still write to its own database. A listener registered another way (`Event::listen()` in `boot()`, discovery, a subscriber) runs in the context of whoever dispatched the event. |
 | A class of a module this process doesn't run throws `ModuleException` from the autoloader | `autoloadModules()` | `class_exists()` on such a class throws instead of returning `false`. A package probing classes (discovery, morph maps) must only meet classes of the modules this process runs. |
 
 Publishing a package's migrations with `vendor:publish` puts them in `database/migrations`: they then run in
@@ -273,12 +273,11 @@ config/distributable.php                   declares the modules: 'modules' => ['
 
 apps/Iam/
 ├── app/                              Apps\Iam\, laid out like a Laravel app
-│   ├── Providers/IamServiceProvider.php
+│   ├── Providers/IamServiceProvider.php   the events it listens to, in $handlers
 │   ├── Models/User.php
 │   └── Events/UserRegistered.php
 ├── config/
-│   ├── database.php                  its connections; if the file exists, the module has a database
-│   └── microservices.php             the events it listens to
+│   └── database.php                  its connections; if the file exists, the module has a database
 ├── database/migrations/
 └── routes/api.php                    served under /iam/api/…
 
@@ -299,7 +298,7 @@ foundation/
 ],
 
 // apps/Iam/app/Providers/IamServiceProvider.php
-final class IamServiceProvider extends \Distributable\Providers\ModuleServiceProvider {}
+final class IamServiceProvider extends \Distributable\Providers\ServiceProvider {}
 
 // apps/Iam/app/Models/User.php: plain Eloquent, it uses iam's database because it runs in iam
 final class User extends \Illuminate\Database\Eloquent\Model {}
@@ -341,8 +340,8 @@ final class RecordSignup implements \Microservices\Contracts\Stream\Handler
     public function handle(string $name, array $payload): void { /* ... */ }
 }
 
-// apps/Analytics/config/microservices.php
-return ['events' => ['listen' => ['iam.user.registered' => [RecordSignup::class]]]];
+// apps/Analytics/app/Providers/AnalyticsServiceProvider.php
+protected array $handlers = ['iam.user.registered' => [RecordSignup::class]];
 ```
 
 ```bash

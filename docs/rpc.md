@@ -26,7 +26,7 @@ final class FoundationServiceProvider extends \Distributable\Providers\Foundatio
 }
 
 // apps/Iam/app/Providers/IamServiceProvider.php
-final class IamServiceProvider extends \Distributable\Providers\ModuleServiceProvider
+final class IamServiceProvider extends \Distributable\Providers\ServiceProvider
 {
     protected array $services = [
         \Foundation\Iam\Contracts\IamService::class => \Apps\Iam\Services\IamService::class,

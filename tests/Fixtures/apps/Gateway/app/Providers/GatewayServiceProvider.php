@@ -4,6 +4,6 @@ declare(strict_types=1);
 
 namespace Apps\Gateway\Providers;
 
-use Distributable\Providers\ModuleServiceProvider;
+use Distributable\Providers\ServiceProvider;
 
-final class GatewayServiceProvider extends ModuleServiceProvider {}
+final class GatewayServiceProvider extends ServiceProvider {}
