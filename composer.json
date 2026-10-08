@@ -1,5 +1,5 @@
 {
-    "name": "mk-josias/laravel-distributable",
+    "name": "mbiakova/laravel-distributable",
     "description": "Laravel modules built as independently deployable microservices: each owns its data, and they talk through events and RPC. Run them as one app, or split them apart whenever you want.",
     "license": "MIT",
     "type": "library",
@@ -21,7 +21,7 @@
     "require": {
         "php": "^8.4",
         "laravel/framework": "^12.0 || ^13.0",
-        "mk-josias/laravel-microservices": "^0.1"
+        "mbiakova/laravel-microservices": "^0.1"
     },
     "repositories": {
         "microservices": {
@@ -30,7 +30,7 @@
             "options": {
                 "symlink": true,
                 "versions": {
-                    "mk-josias/laravel-microservices": "0.1.0"
+                    "mbiakova/laravel-microservices": "0.1.0"
                 }
             }
         }

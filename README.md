@@ -20,22 +20,22 @@ another. The package sets up what is missing:
   doesn't run, and `distributable:unused-packages` the Composer packages only they required.
 
 ```bash
-composer require mk-josias/laravel-distributable
+composer require mbiakova/laravel-distributable
 php artisan distributable:install                      # config/distributable.php, apps/, foundation/FoundationServiceProvider.php
 php artisan distributable:make-module iam --database   # apps/Iam and foundation/Iam, declared in config/distributable.php
 ```
 
-[laravel-distributable-skeleton](https://github.com/mk-josias/laravel-distributable-skeleton) is the example
+[laravel-skeleton](https://github.com/mbiakova/laravel-skeleton) is the example
 implementation: an application with three modules, authentication, permissions, Docker images for
 one process or one per module, and tests of each module alone. Read it to see the package in use,
 or start from it:
 
 ```bash
-composer create-project mk-josias/laravel-distributable-skeleton my-app
+composer create-project mbiakova/laravel-skeleton my-app
 ```
 
 Requires PHP 8.4+ and Laravel 12 or 13. Events, calls and copies between modules come from
-[laravel-microservices](https://github.com/mk-josias/laravel-microservices), which an application
+[laravel-microservices](https://github.com/mbiakova/laravel-microservices), which an application
 on its own can use too: each module is one of its services. There is no other runtime dependency.
 
 - [Why](#why)
@@ -353,7 +353,7 @@ php artisan microservices:events:consume --module=analytics
 
 This event is version 1. When the shape of a payload changes, the event declares a new version and
 how to read the old ones, so events already in the stream stay readable: see
-[Versioning a payload](https://github.com/mk-josias/laravel-microservices/blob/main/docs/events.md#versioning-a-payload).
+[Versioning a payload](https://github.com/mbiakova/laravel-microservices/blob/main/docs/events.md#versioning-a-payload).
 
 Then check that every module could run apart:
 

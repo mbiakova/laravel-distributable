@@ -1,6 +1,6 @@
 # Read-only copies (shadows)
 
-Copies of another module's rows are [laravel-microservices' copies](https://github.com/mk-josias/laravel-microservices/blob/main/docs/shadows.md):
+Copies of another module's rows are [laravel-microservices' copies](https://github.com/mbiakova/laravel-microservices/blob/main/docs/shadows.md):
 each module is a service. What a module adds is where each piece lives, and which database the
 copy is in.
 

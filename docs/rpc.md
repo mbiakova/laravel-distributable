@@ -1,6 +1,6 @@
 # Calls between modules (RPC)
 
-Calls between modules are [laravel-microservices' RPC](https://github.com/mk-josias/laravel-microservices/blob/main/docs/rpc.md):
+Calls between modules are [laravel-microservices' RPC](https://github.com/mbiakova/laravel-microservices/blob/main/docs/rpc.md):
 each module is a service, named after it. This page covers what a module adds; the signature, the
 status codes, the answer cache and custom transports are described there.
 

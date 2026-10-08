@@ -1,6 +1,6 @@
 # Events
 
-Events between modules are [laravel-microservices' events](https://github.com/mk-josias/laravel-microservices/blob/main/docs/events.md):
+Events between modules are [laravel-microservices' events](https://github.com/mbiakova/laravel-microservices/blob/main/docs/events.md):
 each module is a service, named after it. The envelope, versions, streams, transports, the outbox
 and the consumption guard are described there. This page covers what a module adds.
 
