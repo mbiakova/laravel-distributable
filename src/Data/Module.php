@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Distributable\Data;
 
 use Distributable\Exceptions\ModuleException;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 
 /**
@@ -78,12 +79,22 @@ final readonly class Module
     }
 
     /**
-     * Owner-role connection: the role that owns the tables and may run DDL, used for migrations.
-     * The runtime connection above stays least-privileged — and on PostgreSQL, subject to the
-     * row-level security policies the owner installs.
+     * The connection the migrate commands use: the module's own, or, when its `owner` key names
+     * the role that owns the tables and may run DDL, a connection built from it. The runtime
+     * connection stays least-privileged — and on PostgreSQL, subject to the row-level security
+     * policies the owner installs.
      */
     public function ownerConnection(): string
     {
-        return $this->name.'_owner';
+        $connection = (array) config("database.connections.{$this->name}");
+
+        if (! is_array($connection['owner'] ?? null)) {
+            return $this->name;
+        }
+
+        $name = $this->name.':owner';
+        config()->set("database.connections.{$name}", [...Arr::except($connection, 'owner'), ...$connection['owner']]);
+
+        return $name;
     }
 }

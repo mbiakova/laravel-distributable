@@ -307,8 +307,11 @@ final class User extends \Illuminate\Database\Eloquent\Model {}
 ```php
 // apps/Iam/config/database.php, merged into config/database.php when iam boots
 return ['connections' => [
-    'iam'       => ['driver' => 'pgsql', 'database' => 'iam', 'username' => 'iam_app'],   // reads and writes
-    'iam_owner' => ['driver' => 'pgsql', 'database' => 'iam', 'username' => 'iam_owner'], // creates and alters tables
+    'iam' => [
+        'driver' => 'pgsql', 'database' => 'iam',
+        'username' => 'iam_app',                       // reads and writes
+        'owner' => ['username' => 'iam_owner'],        // creates and alters tables; optional
+    ],
 ]];
 ```
 

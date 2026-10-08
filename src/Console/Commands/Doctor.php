@@ -36,10 +36,8 @@ final class Doctor extends Command
                 $problems[] = "[{$module->name}] provider {$module->provider} does not exist.";
             }
 
-            foreach ($module->hasDatabase ? [$module->connection(), $module->ownerConnection()] : [] as $connection) {
-                if (config("database.connections.{$connection}") === null) {
-                    $problems[] = "[{$module->name}] connection [{$connection}] is not declared.";
-                }
+            if ($module->hasDatabase && config("database.connections.{$module->connection()}") === null) {
+                $problems[] = "[{$module->name}] connection [{$module->connection()}] is not declared.";
             }
 
             if (! $module->hasDatabase && is_dir($module->path().'/database/migrations')) {

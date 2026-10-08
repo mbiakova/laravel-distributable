@@ -47,7 +47,7 @@ it('has nothing to seed in a module without a DatabaseSeeder', function () {
 it('seeds each module with its own seeders when a migration run is asked to seed', function () {
     $this->artisan('migrate:fresh --seed --module=iam --module=analytics')->assertSuccessful();
 
-    expect(DB::connection('iam_owner')->table('iam_users')->pluck('name')->all())->toBe(['seeded']);
+    expect(DB::connection('iam')->table('iam_users')->pluck('name')->all())->toBe(['seeded']);
 });
 
 it('refuses a module nobody declared', function () {

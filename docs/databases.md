@@ -2,21 +2,28 @@
 
 ## Connections
 
-A module with a database has two connections, named after it. There is no mapping to fill in: the
-name is the link, so module `iam` uses the connections `iam` and `iam_owner`, and no other.
+A module with a database has one connection, named after it. There is no mapping to fill in: the
+name is the link, so module `iam` uses the connection `iam`, and no other.
 
-| Connection | Role |
-|---|---|
-| `{module}` | Used at runtime to read and write rows. |
-| `{module}_owner` | Owns the tables and can create and alter them. Only the `migrate` commands use it. |
+```php
+'iam' => [
+    'driver' => 'pgsql', 'database' => 'iam',
+    'username' => env('IAM_USERNAME'), 'password' => env('IAM_PASSWORD'),   // reads and writes rows
+    'owner' => ['username' => env('IAM_OWNER'), 'password' => env('IAM_OWNER_PASSWORD')],   // optional
+],
+```
 
-Declare them where you prefer; the module has a database as soon as the connection `{module}` exists:
+The `owner` key is the role that owns the tables and can create and alter them. Only the `migrate`
+commands use it: they run on a connection built from `iam` with the `owner` values over it
+(`iam:owner`). Without the key, they run on `iam` itself, which suits one role for everything.
+
+Declare the connection where you prefer; the module has a database as soon as it exists:
 
 | Where | Result |
 |---|---|
 | the module's `config/database.php` | merged into `database.connections`; the module carries its own setup |
 | the root `config/database.php`, next to `sqlite` and `pgsql` | the same, with every connection in one file |
-| nowhere | the module has no database of its own: it uses the application's, and its migrations run there |
+| nowhere | the module has no database: its queries fail with `no_module`, and `distributable:doctor` reports any migration it has |
 
 The connections can point to separate databases on one server, separate schemas of one database,
 separate servers, or sqlite files in tests. The code is the same in every case. Several modules can
@@ -114,7 +121,7 @@ php artisan migrate | migrate:status | migrate:rollback | migrate:reset | migrat
 
 | Database | Migrations |
 |---|---|
-| each local module's database, on `{module}_owner` | the package's tables (`event_publications`, `event_consumptions`), `database/migrations`, the migrations other packages load, the module's `database/migrations` and the shadow migrations of the copies it keeps |
+| each local module's database, on its owner connection | the package's tables (`event_publications`, `event_consumptions`), `database/migrations`, the migrations other packages load, the module's `database/migrations` and the shadow migrations of the copies it keeps |
 
 A module without a database has no migrations: `distributable:doctor` reports one that does. The
 `database` drivers of the cache, the queue and the session have no database to use either, and

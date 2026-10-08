@@ -65,7 +65,7 @@ final readonly class Boundaries
         return array_values(array_unique($violations));
     }
 
-    /** @return list<string> the module's two connections and every table its migrations create */
+    /** @return list<string> the module's connections and every table its migrations create */
     private function storageOf(Module $module): array
     {
         $tables = [];

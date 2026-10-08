@@ -18,7 +18,16 @@ it('derives every convention from the module name', function () {
         ->and($module->path())->toBe(base_path('apps/PointOfSale'))
         ->and($module->classPath())->toBe(base_path('apps/PointOfSale/app'))
         ->and($module->connection())->toBe('point_of_sale')
-        ->and($module->ownerConnection())->toBe('point_of_sale_owner');
+        ->and($module->ownerConnection())->toBe('point_of_sale');
+});
+
+it('migrates on a connection built from the owner key of its connection, when it has one', function () {
+    config()->set('database.connections.point_of_sale', [
+        'driver' => 'pgsql', 'database' => 'pos', 'username' => 'pos_app', 'owner' => ['username' => 'pos_owner'],
+    ]);
+
+    expect(Module::fromName('point_of_sale', 'Apps', 'apps')->ownerConnection())->toBe('point_of_sale:owner')
+        ->and(config('database.connections.point_of_sale:owner'))->toBe(['driver' => 'pgsql', 'database' => 'pos', 'username' => 'pos_owner']);
 });
 
 it('has no database when no connection is named after the module', function () {

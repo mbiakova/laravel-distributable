@@ -24,10 +24,10 @@ it('reports a module importing another module', function () {
 
 it('reports a module reaching into another module database, by its connection or its table', function () {
     $file = dirname(__DIR__).'/Fixtures/apps/Analytics/app/Leak.php';
-    file_put_contents($file, "<?php\n\nnamespace Apps\\Analytics;\n\n\\DB::connection('iam_owner')->table('iam_users')->count();\n");
+    file_put_contents($file, "<?php\n\nnamespace Apps\\Analytics;\n\n\\DB::connection('iam')->table('iam_users')->count();\n");
 
     try {
-        expect($this->app->make(Boundaries::class)->violations())->toBe(["{$file}: 'iam_owner'", "{$file}: 'iam_users'"]);
+        expect($this->app->make(Boundaries::class)->violations())->toBe(["{$file}: 'iam'", "{$file}: 'iam_users'"]);
     } finally {
         unlink($file);
     }

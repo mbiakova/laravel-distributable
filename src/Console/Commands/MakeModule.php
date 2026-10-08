@@ -52,8 +52,12 @@ final class MakeModule extends Command
                 declare(strict_types=1);
 
                 return ['connections' => [
-                    '{$module->name}' => ['driver' => env('DB_CONNECTION', 'pgsql'), 'database' => '{$module->name}', 'username' => '{$module->name}_app'],
-                    '{$module->name}_owner' => ['driver' => env('DB_CONNECTION', 'pgsql'), 'database' => '{$module->name}', 'username' => '{$module->name}_owner'],
+                    '{$module->name}' => [
+                        'driver' => env('DB_CONNECTION', 'pgsql'),
+                        'database' => '{$module->name}',
+                        'username' => '{$module->name}_app',
+                        'owner' => ['username' => '{$module->name}_owner'],
+                    ],
                 ]];
 
                 PHP;

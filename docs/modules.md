@@ -110,7 +110,7 @@ package reads everything from the folder and the namespace, so there is nothing 
 | Where the foundation lives | `paths.foundation` (`foundation`), `namespaces.foundation` (`Foundation`) | what module `iam` shares is `{paths.foundation}/Iam`, under `Foundation\Iam\` |
 | A module's code | | `app/`, under `{namespaces.modules}\{Name}\` |
 | A module's provider | | `app/Providers/{Name}ServiceProvider.php` |
-| A module's database | | it has one exactly when a connection named `{name}` exists, declared in the module's `config/database.php` or the root one, next to `{name}_owner` |
+| A module's database | | it has one exactly when a connection named `{name}` exists, declared in the module's `config/database.php` or the root one |
 | A module's config, routes, translations, migrations | | `config/*.php`, `routes/{surface}.php` (served under `{name}/{surface}`), `lang/`, `database/migrations/` |
 | A module's commands | | every `Illuminate\Console\Command` under `app/` |
 | A module's factories and seeders | | `database/factories/` under `{namespaces.modules}\{Name}\Database\Factories\`, `database/seeders/` under `…\Database\Seeders\` |
@@ -274,7 +274,7 @@ php artisan distributable:doctor
 |---|---|
 | a folder of `apps/` that `distributable.modules` doesn't declare | `[apps/Billing] is not declared in distributable.modules.` |
 | a module whose service provider class doesn't exist | `[gateway] provider Apps\Gateway\Providers\GatewayServiceProvider does not exist.` |
-| a local module with a database but no declared connection | `[iam] connection [iam_owner] is not declared.` |
+| a local module with a database but no declared connection | `[iam] connection [iam] is not declared.` |
 | a module running elsewhere that serves a contract, with no host | `[iam] runs elsewhere and serves Foundation\Iam\Contracts\IamService, but distributable.modules.iam.host is not set.` |
 | RPC contracts declared while the secret is empty | `Modules serve RPC contracts but microservices.rpc.secret is empty: set MICROSERVICES_RPC_SECRET or APP_KEY.` |
 | a module using another module's classes, or the foundation or the application (`app/`, `routes/`, `config/`) using a module | `Boundary crossed: apps/Analytics/app/Models/Report.php: Apps\Iam\Models\User` |

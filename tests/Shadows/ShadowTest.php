@@ -12,14 +12,10 @@ use Illuminate\Support\Facades\Schema;
 uses(ModuleAppTestCase::class);
 
 beforeEach(function () {
-    // One file per module, shared by its runtime and owner connections, as in production.
+    // One file per module database.
     foreach (['iam', 'analytics'] as $module) {
-        $file = tempnam(sys_get_temp_dir(), "distributable-{$module}-");
-
-        foreach ([$module, "{$module}_owner"] as $connection) {
-            config()->set("database.connections.{$connection}.database", $file);
-            DB::purge($connection);
-        }
+        config()->set("database.connections.{$module}.database", tempnam(sys_get_temp_dir(), "distributable-{$module}-"));
+        DB::purge($module);
     }
 
     $this->artisan('migrate')->assertSuccessful();
