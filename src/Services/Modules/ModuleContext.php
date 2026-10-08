@@ -37,16 +37,16 @@ final class ModuleContext
         // request from its own copy, with its own config.
         $config = Container::getInstance()->make(Repository::class);
 
-        $config->set('database.default', $module !== null && $module->hasDatabase
-            ? $module->connection()
-            : self::NO_MODULE);
-
         // The application's values first, then the ones this module sets for itself (ServiceProvider).
         $config->set(Arr::dot((array) $config->get('distributable.overlay_base', [])));
 
         if ($module !== null) {
             $config->set(Arr::dot((array) $config->get("distributable.overlays.{$module->name}", [])));
         }
+
+        $config->set('database.default', $module !== null && $module->hasDatabase
+            ? $module->connection()
+            : self::NO_MODULE);
 
         $this->swapServices($module, (array) $config->get('distributable.per_module', []));
 

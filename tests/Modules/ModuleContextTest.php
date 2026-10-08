@@ -73,6 +73,17 @@ it('tells which listeners a module attached, where Event::assertListening() only
     $this->assertListeningInModule(SomethingHappened::class, RecordEventConnection::class.'@remember');
 });
 
+it('keeps the context connection when a module config sets database.default', function () {
+    config()->set('distributable.overlay_base.database.default', 'sqlite');
+    config()->set('distributable.overlays.iam.database.default', 'elsewhere');
+
+    app(ModuleContext::class)->switchTo(null);
+
+    expect(DB::getDefaultConnection())->toBe(ModuleContext::NO_MODULE)
+        ->and($this->inModule('iam', fn () => DB::getDefaultConnection()))->toBe('iam')
+        ->and(DB::getDefaultConnection())->toBe(ModuleContext::NO_MODULE);
+});
+
 it('gives the application its own connection back outside any module', function () {
     $default = DB::getDefaultConnection();
     $context = app(ModuleContext::class);
