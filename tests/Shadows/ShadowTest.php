@@ -23,12 +23,12 @@ beforeEach(function () {
 
 function copies(): Builder
 {
-    return DB::connection('analytics')->table('analytics_iam_users');
+    return DB::connection('analytics')->table('iam_users');
 }
 
-it('migrates the copy into the keeper database, named after the keeper', function () {
-    expect(Schema::connection('analytics')->hasTable('analytics_iam_users'))->toBeTrue()
-        ->and(Schema::connection('iam')->hasTable('analytics_iam_users'))->toBeFalse();
+it('migrates the copy into the keeper database, under its source name', function () {
+    expect(Schema::connection('analytics')->hasTable('iam_users'))->toBeTrue()
+        ->and(Schema::connection('analytics')->hasColumn('iam_users', 'deleted_at'))->toBeTrue();
 });
 
 it('keeps the copy in step with the source, deletion included', function () {

@@ -23,7 +23,7 @@ abstract class UserShadow extends \Microservices\Models\ShadowModel
     public static function sourceTable(): string { return 'iam_users'; }
 }
 
-// apps/Analytics/app/Models/UserShadow.php, analytics keeps a copy in the analytics_iam_users table
+// apps/Analytics/app/Models/UserShadow.php, analytics keeps a copy in the iam_users table
 final class UserShadow extends \Foundation\Iam\Shadows\UserShadow {}
 ```
 

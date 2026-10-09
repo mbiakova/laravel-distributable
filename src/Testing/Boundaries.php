@@ -8,6 +8,7 @@ use Distributable\Config\Modules;
 use Distributable\Data\Module;
 use Distributable\Services\Modules\ModuleRegistry;
 use Illuminate\Support\Str;
+use Microservices\Services\Shadows\ShadowRegistry;
 use PhpToken;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -19,6 +20,7 @@ final readonly class Boundaries
     public function __construct(
         private ModuleRegistry $registry,
         private Modules $config,
+        private ShadowRegistry $shadows,
     ) {}
 
     /** @return list<string> one "{file}: {name}" per reference crossing a boundary */
@@ -29,7 +31,9 @@ final readonly class Boundaries
 
         foreach ($modules as $module) {
             $others = array_values(array_filter($modules, static fn (Module $other): bool => $other->name !== $module->name));
-            $foreign = array_merge(...array_map(fn (Module $other): array => $this->storageOf($other), $others));
+            // A copy the module keeps may bear its source's name: that name is the module's own table.
+            $copies = array_map(static fn (string $shadow): string => (new $shadow)->getTable(), $this->shadows->localShadows($module->name));
+            $foreign = array_diff(array_merge(...array_map(fn (Module $other): array => $this->storageOf($other), $others)), $copies);
 
             foreach ($this->references($module->path()) as $file => $names) {
                 foreach ($names as $name) {
