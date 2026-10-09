@@ -38,7 +38,7 @@ src/
 ├── Traits/             ResolvesModule
 ├── Support/            ModuleDeferredCallbacks · ModuleConcurrencyDriver · ModuleTaskDispatcher · ModuleFactories
 ├── Exceptions/         ModuleException
-├── Testing/            Boundaries · InteractsWithModules
+├── Testing/            Boundaries · ModuleAware
 └── Services/Modules/   ModuleRegistry · ModuleContext · ModuleColocation · ModuleRpcTransport
                         CachedShadowRegistry · DiscoveryCache · ModuleMigrations · ComposerAutoload
 ```

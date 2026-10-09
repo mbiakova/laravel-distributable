@@ -241,7 +241,7 @@ final class IamServiceProvider extends ServiceProvider
 Laravel's own event discovery doesn't see a module's `app/Listeners`: it names
 `apps/Iam/app/Listeners/X.php` `Apps\Iam\app\Listeners\X`. Declare the listeners in `$listen`.
 In a test, `Event::assertListening()` only sees a closure for them: use
-`$this->assertListeningInModule(Login::class, RecordLogin::class)` from `InteractsWithModules`.
+`$this->assertListeningInModule(Login::class, RecordLogin::class)` from `ModuleAware`.
 
 ## The foundation
 

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Distributable\Tests\Support;
 
-use Distributable\Testing\InteractsWithModules;
+use Distributable\Testing\ModuleAware;
 use Distributable\Tests\TestCase;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Foundation\Application;
@@ -12,7 +12,7 @@ use Illuminate\Foundation\Application;
 /** Boots the app against the fixture module tree, as a consumer application would. */
 abstract class ModuleAppTestCase extends TestCase
 {
-    use InteractsWithModules;
+    use ModuleAware;
 
     /** @param Application $app */
     protected function defineEnvironment($app): void

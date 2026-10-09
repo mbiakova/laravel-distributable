@@ -94,7 +94,7 @@ the module's own code may enter a module: when the code calling `within()` (dire
 whatever names the module, a string, a variable or an enum. The check reads the caller's file
 from the call stack, so code that never runs is not checked, and `distributable:doctor` cannot see it.
 
-In tests, use `Distributable\Testing\InteractsWithModules`:
+In tests, use `Distributable\Testing\ModuleAware`:
 
 ```php
 $user = $this->inModule('iam', fn () => User::query()->create(['name' => 'ada']));   // iam database

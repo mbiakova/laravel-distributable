@@ -29,6 +29,9 @@ final class ModuleContext
 
     private const string SERVICES = 'distributable.module_services';
 
+    /** @var list<string|null> the module each open request or command found running */
+    private array $entered = [];
+
     public function __construct(private readonly ModuleRegistry $registry) {}
 
     public function switchTo(?Module $module): void
@@ -101,6 +104,23 @@ final class ModuleContext
         $this->switchTo($this->registry->forClass($class));
     }
 
+    /** A request or a command starts in $module; leave() gives back the module it found running. */
+    public function enter(?Module $module): void
+    {
+        $this->entered[] = $this->current()?->name;
+        $this->switchTo($module);
+    }
+
+    public function leave(): void
+    {
+        if ($this->entered === []) {
+            return;
+        }
+
+        $name = array_pop($this->entered);
+        $this->switchTo($name === null ? null : $this->registry->find($name));
+    }
+
     /**
      * Wraps $task so it runs in the current module wherever it runs later: after the response, in
      * another worker, in a child process. Only the module's name is captured, so the task stays
@@ -148,7 +168,7 @@ final class ModuleContext
      */
     private function refuseAnotherModuleCaller(Module $module): void
     {
-        $relays = [dirname(__DIR__).'/Modules/ModuleColocation.php', dirname(__DIR__, 2).'/Testing/InteractsWithModules.php'];
+        $relays = [dirname(__DIR__).'/Modules/ModuleColocation.php', dirname(__DIR__, 2).'/Testing/ModuleAware.php'];
 
         foreach (debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS) as $frame) {
             $file = $frame['file'] ?? null;

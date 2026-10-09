@@ -12,3 +12,5 @@ parameters:
         - src
         - tests/Fixtures
         - tests/Support
+    excludePaths:
+        - tests/Fixtures/apps/*/tests/*

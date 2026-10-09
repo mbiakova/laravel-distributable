@@ -53,6 +53,7 @@ use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\Console\Migrations as Laravel;
 use Illuminate\Database\Console\Seeds\SeedCommand;
 use Illuminate\Database\DatabaseManager;
+use Illuminate\Foundation\Http\Events\RequestHandled;
 use Illuminate\Process\Factory as ProcessFactory;
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Routing\Events\RouteMatched;
@@ -189,19 +190,18 @@ final class DistributableServiceProvider extends BaseServiceProvider
         // Wherever the route is declared: a module's own file, routes/web.php or another package.
         Event::listen(RouteMatched::class, static function (RouteMatched $event): void {
             $app = Container::getInstance();
-            $module = $app->make(ModuleRegistry::class)->forClass((string) $event->route->getControllerClass());
-
-            if ($module !== null) {
-                $app->make(ModuleContext::class)->switchTo($module);
-            }
+            $context = $app->make(ModuleContext::class);
+            $context->enter($app->make(ModuleRegistry::class)->forClass((string) $event->route->getControllerClass()) ?? $context->current());
         });
+
+        // A request or a command run inside another (a test, Octane, Artisan::call) gives its module back.
+        Event::listen(RequestHandled::class, fn () => $this->app->make(ModuleContext::class)->leave());
+        Event::listen(CommandFinished::class, fn () => $this->app->make(ModuleContext::class)->leave());
 
         Event::listen(CommandStarting::class, function (CommandStarting $event): void {
             $command = $this->app->make(ConsoleKernel::class)->all()[$event->command] ?? null;
-
-            if ($command !== null) {
-                $this->app->make(ModuleContext::class)->switchToModuleOf($command::class);
-            }
+            $context = $this->app->make(ModuleContext::class);
+            $context->enter($command === null ? $context->current() : $this->app->make(ModuleRegistry::class)->forClass($command::class));
 
             // --module on any command (db:seed, tinker, model:show…) names the module it runs in.
             if (is_string($named = $event->input->getParameterOption('--module', null))) {
